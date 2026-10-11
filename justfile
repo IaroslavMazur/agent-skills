@@ -99,7 +99,7 @@ alias pw := prettier-write
 [group("checks")]
 [positional-arguments]
 @shell-check *paths:
-    if [ "$#" -eq 0 ]; then shellcheck skills/*/scripts/*.sh tests/*/*.sh tests/*/*.bats; else shellcheck "$@"; fi
+    if [ "$#" -eq 0 ]; then shellcheck mcp/*.sh skills/*/scripts/*.sh tests/*/*.sh tests/*/*.bats; else shellcheck "$@"; fi
 
 # Run every test suite, the TypeScript check, and the evm-atlas freshness check
 [group("checks")]
