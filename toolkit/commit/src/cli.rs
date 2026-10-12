@@ -77,6 +77,15 @@ pub struct CommitArgs {
     #[arg(short = 'm', long = "message", required = true, allow_hyphen_values = true)]
     pub messages: Vec<String>,
 
+    /// Append a `Closes #N` line for one issue number; repeat for several issues.
+    #[arg(long = "close", value_name = "ISSUE", value_parser = parse_issue_number)]
+    pub close: Vec<u64>,
+
+    /// Append a `Finding-ID: <id>` trailer and, after the commit, resolve that ai-coord finding as
+    /// fixed with the commit OID; repeat for several findings.
+    #[arg(long = "finding", value_name = "ID", value_parser = parse_finding_id)]
+    pub findings: Vec<String>,
+
     /// Push after creating or recovering the commit.
     #[arg(long)]
     pub push: bool,
@@ -106,4 +115,18 @@ pub struct PushArgs {
 #[derive(Debug, Args)]
 pub struct TransactionArgs {
     pub transaction_id: String,
+}
+
+fn parse_issue_number(value: &str) -> Result<u64, String> {
+    if value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_digit()) || value.starts_with('0') {
+        return Err(format!("issue number must be a positive decimal integer, got {value:?}"));
+    }
+    value.parse().map_err(|_| format!("issue number is out of range: {value}"))
+}
+
+fn parse_finding_id(value: &str) -> Result<String, String> {
+    if value.is_empty() || !value.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.')) {
+        return Err(format!("finding ID must contain only ASCII letters, digits, '-', '_' or '.', got {value:?}"));
+    }
+    Ok(value.to_owned())
 }

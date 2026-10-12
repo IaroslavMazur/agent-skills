@@ -1,24 +1,17 @@
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
     env, fs,
-    io::Read,
     path::{Component, Path},
-    process::{Command, Stdio},
-    time::Duration,
 };
 
 use rand::random;
 use tempfile::Builder;
-use wait_timeout::ChildExt;
 
 use crate::{
     cli::{DiffMode, PrepareArgs},
-    config,
+    config, coord,
     error::{AppError, Result},
-    git::{
-        Repository, clear_repository_environment, copy_file, decode_nul_paths, git_error, literal_pathspec,
-        validate_safe_path_text,
-    },
+    git::{Repository, copy_file, decode_nul_paths, git_error, literal_pathspec, validate_safe_path_text},
     rules,
     state::{MessageFormat, Store, Transaction, TransactionStatus, now_seconds},
 };
@@ -32,8 +25,6 @@ struct Baseline {
 }
 
 pub(crate) const PATH_BATCH_SIZE: usize = 32;
-const AI_COORD_BASELINE_TIMEOUT: Duration = Duration::from_secs(5);
-const AI_COORD_TRAILER_TIMEOUT: Duration = Duration::from_millis(750);
 
 pub fn run(args: PrepareArgs, store: &Store) -> Result<()> {
     Repository::ensure_default_index_env()?;
@@ -460,7 +451,7 @@ fn parse_baselines(repository: &Repository, args: &PrepareArgs, intended_paths: 
 }
 
 fn bounded_baselines(repository_root: &Path) -> Vec<(String, String)> {
-    let Some(bytes) = bounded_ai_coord(repository_root, "baseline", 64 * 1024, AI_COORD_BASELINE_TIMEOUT) else {
+    let Some(bytes) = coord::bounded(repository_root, "baseline", 64 * 1024, coord::BASELINE_TIMEOUT) else {
         return Vec::new();
     };
     let Ok(text) = String::from_utf8(bytes) else {
@@ -590,7 +581,7 @@ fn allocate_id(store: &Store) -> Result<String> {
 }
 
 fn bounded_trailer(repository_root: &Path) -> Option<String> {
-    let bytes = bounded_ai_coord(repository_root, "trailer", 512, AI_COORD_TRAILER_TIMEOUT)?;
+    let bytes = coord::bounded(repository_root, "trailer", 512, coord::TRAILER_TIMEOUT)?;
     let text = String::from_utf8(bytes).ok()?;
     let line = text.trim_end_matches(['\r', '\n']);
     if line.is_empty() ||
@@ -603,47 +594,6 @@ fn bounded_trailer(repository_root: &Path) -> Option<String> {
         return None;
     }
     Some(line.to_owned())
-}
-
-fn bounded_ai_coord(repository_root: &Path, subcommand: &str, limit: u64, timeout: Duration) -> Option<Vec<u8>> {
-    let timeout = env::var("AI_COMMIT_TEST_COORD_TIMEOUT_MS")
-        .ok()
-        .and_then(|value| value.parse::<u64>().ok())
-        .filter(|milliseconds| *milliseconds > 0)
-        .map(Duration::from_millis)
-        .unwrap_or(timeout);
-    let mut command = Command::new("ai-coord");
-    clear_repository_environment(&mut command);
-    let mut child = command
-        .arg(subcommand)
-        .current_dir(repository_root)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .ok()?;
-    let stdout = child.stdout.take()?;
-    let reader = std::thread::spawn(move || {
-        let mut bytes = Vec::new();
-        stdout.take(limit + 1).read_to_end(&mut bytes).ok()?;
-        Some(bytes)
-    });
-    let status = match child.wait_timeout(timeout).ok()? {
-        Some(status) => status,
-        None => {
-            let _ = child.kill();
-            let _ = child.wait();
-            return None;
-        }
-    };
-    let bytes = reader.join().ok()??;
-    if !status.success() {
-        return None;
-    }
-    if bytes.len() as u64 > limit {
-        return None;
-    }
-    Some(bytes)
 }
 
 const DIFF_FILE_LINE_LIMIT: usize = 400;

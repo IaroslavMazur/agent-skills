@@ -14,6 +14,7 @@ use tempfile::{Builder, NamedTempFile, TempPath};
 
 use crate::{
     cli::CommitArgs,
+    coord,
     error::{AppError, Result},
     git::{RefUpdate, Repository, copy_file, git_error},
     push::{self, PushOutcome},
@@ -26,6 +27,11 @@ use crate::{
 
 pub fn run(args: CommitArgs, store: &Store) -> Result<()> {
     validate_message_arguments(&args.messages)?;
+    run_transaction(&args, store)?;
+    resolve_findings(&args, store)
+}
+
+fn run_transaction(args: &CommitArgs, store: &Store) -> Result<()> {
     Repository::ensure_default_index_env()?;
     let _transaction_lock = store.lock(&args.transaction_id)?;
     let mut transaction = store.load(&args.transaction_id)?;
@@ -60,7 +66,7 @@ pub fn run(args: CommitArgs, store: &Store) -> Result<()> {
     ensure_branch(&repository, &transaction.branch)?;
     if transaction.status == TransactionStatus::Committed && transaction.reconciled {
         print_commit_receipt(&transaction);
-        return maybe_push(&repository, &mut transaction, store, &args);
+        return maybe_push(&repository, &mut transaction, store, args);
     }
 
     repository.ensure_idle()?;
@@ -81,12 +87,12 @@ pub fn run(args: CommitArgs, store: &Store) -> Result<()> {
         recover_after_ref_update(&repository, &mut transaction, store, &mut index_lock, temporary.path())?
     {
         print_commit_receipt(&transaction);
-        return maybe_push(&repository, &mut transaction, store, &args);
+        return maybe_push(&repository, &mut transaction, store, args);
     }
 
     let commit_index = temporary.path().join("commit-index");
     let message_file = temporary.path().join("commit-message");
-    write_message(&message_file, &args.messages)?;
+    write_message(&message_file, &compose_message(args, &transaction))?;
 
     let (candidate, hook_snapshot, run_hooks) = match transaction.validation_command.as_deref() {
         Some(command) => {
@@ -248,7 +254,7 @@ pub fn run(args: CommitArgs, store: &Store) -> Result<()> {
     let _ = run_hook(&repository, &shared_index, "post-commit", &[]);
     drop(index_lock);
     print_commit_receipt(&transaction);
-    maybe_push(&repository, &mut transaction, store, &args)
+    maybe_push(&repository, &mut transaction, store, args)
 }
 
 const VALIDATION_ATTEMPTS: usize = 3;
@@ -392,6 +398,102 @@ fn recover_after_ref_update(
 fn mark_committed(transaction: &mut Transaction, commit_oid: &str) {
     transaction.status = TransactionStatus::Committed;
     transaction.commit_oid = Some(commit_oid.to_owned());
+}
+
+/// Appends the generated `Closes #N` paragraph and the trailer paragraph (`Finding-ID`, then the
+/// prepared `Agent-Session` line). Trailers merge into a final paragraph that already consists of
+/// `Token: value` lines so Git and GitHub still see one trailer block. `Closes #N` is not a Git
+/// trailer, so it stays in its own paragraph. Lines already present verbatim are not repeated.
+fn compose_message(args: &CommitArgs, transaction: &Transaction) -> Vec<String> {
+    let present: BTreeSet<&str> = args.messages.iter().flat_map(|message| message.lines()).map(str::trim_end).collect();
+    let closes: Vec<String> = unique(&args.close)
+        .into_iter()
+        .map(|number| format!("Closes #{number}"))
+        .filter(|line| !present.contains(line.as_str()))
+        .collect();
+    let mut trailers: Vec<String> = unique(&args.findings).into_iter().map(|id| format!("Finding-ID: {id}")).collect();
+    trailers.extend(transaction.trailer.clone());
+    trailers.retain(|line| !present.contains(line.as_str()));
+
+    let mut paragraphs = args.messages.clone();
+    let existing_trailers = match paragraphs.last() {
+        Some(last) if paragraphs.len() > 1 && is_trailer_paragraph(last) => paragraphs.pop(),
+        _ => None,
+    };
+    if !closes.is_empty() {
+        paragraphs.push(closes.join("\n"));
+    }
+    if existing_trailers.is_some() || !trailers.is_empty() {
+        let mut lines: Vec<String> = existing_trailers.into_iter().collect();
+        lines.extend(trailers);
+        paragraphs.push(lines.join("\n"));
+    }
+    paragraphs
+}
+
+// Mirrors Git's trailer block rule: every line is `token: value` or an indented continuation.
+fn is_trailer_paragraph(paragraph: &str) -> bool {
+    let mut saw_trailer = false;
+    for line in paragraph.lines() {
+        if line.starts_with([' ', '\t']) {
+            continue;
+        }
+        let Some((token, value)) = line.split_once(": ") else {
+            return false;
+        };
+        let valid_token = token.starts_with(|c: char| c.is_ascii_alphabetic()) &&
+            token.chars().all(|c| c.is_ascii_alphanumeric() || c == '-');
+        if !valid_token || value.trim().is_empty() {
+            return false;
+        }
+        saw_trailer = true;
+    }
+    saw_trailer
+}
+
+fn unique<T: Clone + PartialEq>(items: &[T]) -> Vec<T> {
+    let mut seen = Vec::with_capacity(items.len());
+    for item in items {
+        if !seen.contains(item) {
+            seen.push(item.clone());
+        }
+    }
+    seen
+}
+
+// Runs after the commit and any push so coordination bookkeeping never blocks either. A failure
+// is retryable: replaying the same command reaches this step again through the retained receipt.
+fn resolve_findings(args: &CommitArgs, store: &Store) -> Result<()> {
+    if args.findings.is_empty() {
+        return Ok(());
+    }
+    let transaction = store.load(&args.transaction_id)?;
+    let Some(oid) = transaction.commit_oid.as_deref() else {
+        return Err(AppError::operational(format!(
+            "transaction {} has no commit to record as finding evidence",
+            transaction.id
+        )));
+    };
+    let mut failures = Vec::new();
+    for id in unique(&args.findings) {
+        match coord::resolve_finding(&transaction.repository_root, &id, oid) {
+            Ok(()) => println!("FINDING_RESOLVED {id}"),
+            Err(reason) => {
+                println!("FINDING_UNRESOLVED {id}");
+                failures.push(format!("  {id}: {reason}"));
+            }
+        }
+    }
+    if failures.is_empty() {
+        return Ok(());
+    }
+    Err(AppError::retry(format!(
+        "commit {} exists, but finding resolution failed; retry the same commit command or run `ai-coord finding \
+         resolve <id> --as fixed --commit {}`:\n{}",
+        short_oid(oid),
+        short_oid(oid),
+        failures.join("\n")
+    )))
 }
 
 fn write_message(path: &Path, messages: &[String]) -> Result<()> {

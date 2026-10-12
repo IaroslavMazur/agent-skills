@@ -1,6 +1,7 @@
 pub mod cli;
 mod commit;
 mod config;
+mod coord;
 mod error;
 mod git;
 mod prepare;
