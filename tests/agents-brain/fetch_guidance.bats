@@ -61,11 +61,11 @@ printf '%s\n' "$conditional_header" >>"$FAKE_CURL_STATE_DIR/requests"
 case "$source_url" in
   *latest-model.md)
     effective_url='https://developers.openai.com/api/docs/guides/latest-model.md'
-    artifact_kind=gpt
+    artifact_kind=openai
     ;;
-  *prompting-claude-opus-5-5.md)
-    effective_url='https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5.md'
-    artifact_kind=claude
+  *claude-prompting-best-practices.md)
+    effective_url='https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices.md'
+    artifact_kind=anthropic
     ;;
   *)
     printf 'unexpected source URL: %s\n' "$source_url" >&2
@@ -75,21 +75,21 @@ esac
 
 write_body() {
   version=$1
-  if [ "$artifact_kind" = gpt ]; then
+  if [ "$artifact_kind" = openai ]; then
     {
-      printf '%s\n' '# Using GPT-6' '### GPT-6.1 Sol' '## Prompting best practices' "version=$version"
+      printf '%s\n' '# Using the latest model' '## Prompting best practices' "version=$version"
       index=0
       while [ "$index" -lt 80 ]; do
-        printf 'GPT prompting fixture padding line %s.\n' "$index"
+        printf 'OpenAI prompting fixture padding line %s.\n' "$index"
         index=$((index + 1))
       done
     } >"$output_file"
   else
     {
-      printf '%s\n' '---' 'title: Prompting Claude Opus 5.5' '---' "version=$version"
+      printf '%s\n' '---' 'title: Prompting best practices' '---' "version=$version"
       index=0
       while [ "$index" -lt 80 ]; do
-        printf 'Claude prompting fixture padding line %s.\n' "$index"
+        printf 'Anthropic prompting fixture padding line %s.\n' "$index"
         index=$((index + 1))
       done
     } >"$output_file"
@@ -128,7 +128,7 @@ write_not_modified() {
 }
 
 write_normal() {
-  if [ "$artifact_kind" = gpt ]; then
+  if [ "$artifact_kind" = openai ]; then
     if [ "$conditional_header" = 'If-None-Match: "v1"' ]; then
       write_not_modified
     else
@@ -173,7 +173,7 @@ case "$mode" in
     write_normal
     ;;
   updated)
-    if [ "$artifact_kind" = gpt ]; then
+    if [ "$artifact_kind" = openai ]; then
       write_ok v2 '"v2"' 'Tue, 11 Aug 2026 09:00:00 GMT'
     else
       write_ok v2 '' ''
@@ -211,141 +211,141 @@ age_cache() {
   mv "$test_root/meta.next" "$cache_dir/$artifact.meta"
 }
 
-@test 'fetches and reuses a fresh GPT-6.1 Sol guide without revalidation' {
-  run "$helper" gpt-6.1-sol
+@test 'fetches and reuses a fresh OpenAI guide without revalidation' {
+  run "$helper" openai
   [ "$status" -eq 0 ]
-  [[ "$output" == *'fetched gpt-6.1-sol'* ]]
-  [ -s "$cache_dir/gpt-6.1-sol-prompting.md" ]
-  validated_epoch=$(sed -n 's/^validated_at_epoch=//p' "$cache_dir/gpt-6.1-sol.meta")
+  [[ "$output" == *'fetched openai'* ]]
+  [ -s "$cache_dir/openai-prompting.md" ]
+  validated_epoch=$(sed -n 's/^validated_at_epoch=//p' "$cache_dir/openai.meta")
 
-  run "$helper" gpt-6.1-sol
+  run "$helper" openai
   [ "$status" -eq 0 ]
-  [[ "$output" == *'cached gpt-6.1-sol last validated at'* ]]
-  [ "$(sed -n 's/^validated_at_epoch=//p' "$cache_dir/gpt-6.1-sol.meta")" = "$validated_epoch" ]
+  [[ "$output" == *'cached openai last validated at'* ]]
+  [ "$(sed -n 's/^validated_at_epoch=//p' "$cache_dir/openai.meta")" = "$validated_epoch" ]
   [ "$(cat "$fake_state/count")" -eq 1 ]
-  grep -Fq 'version=v1' "$cache_dir/gpt-6.1-sol-prompting.md"
+  grep -Fq 'version=v1' "$cache_dir/openai-prompting.md"
 }
 
-@test 'conditionally revalidates an older GPT-6.1 Sol guide with its ETag' {
-  run "$helper" gpt-6.1-sol
+@test 'conditionally revalidates an older OpenAI guide with its ETag' {
+  run "$helper" openai
   [ "$status" -eq 0 ]
-  age_cache gpt-6.1-sol 86401
+  age_cache openai 86401
 
-  run "$helper" gpt-6.1-sol
+  run "$helper" openai
   [ "$status" -eq 0 ]
-  [[ "$output" == *'revalidated gpt-6.1-sol'* ]]
+  [[ "$output" == *'revalidated openai'* ]]
   grep -Fq 'If-None-Match: "v1"' "$fake_state/requests"
   [ "$(cat "$fake_state/count")" -eq 2 ]
 }
 
 @test 'conditionally revalidates with Last-Modified when no ETag is available' {
   export FAKE_CURL_MODE=last-modified
-  run "$helper" gpt-6.1-sol
+  run "$helper" openai
   [ "$status" -eq 0 ]
-  age_cache gpt-6.1-sol 86401
+  age_cache openai 86401
 
-  run "$helper" gpt-6.1-sol
+  run "$helper" openai
   [ "$status" -eq 0 ]
-  [[ "$output" == *'revalidated gpt-6.1-sol'* ]]
+  [[ "$output" == *'revalidated openai'* ]]
   grep -Fq 'If-Modified-Since: Tue, 11 Aug 2026 08:00:00 GMT' "$fake_state/requests"
   [ "$(cat "$fake_state/count")" -eq 2 ]
 }
 
-@test 'supports the fixed Claude guide and refreshes it without validators' {
-  run "$helper" claude-opus-5-5
+@test 'supports the Anthropic guide and refreshes it without validators' {
+  run "$helper" anthropic
   [ "$status" -eq 0 ]
-  [[ "$output" == *'fetched claude-opus-5-5'* ]]
-  grep -Fq 'title: Prompting Claude Opus 5.5' "$cache_dir/claude-opus-5-5-prompting.md"
+  [[ "$output" == *'fetched anthropic'* ]]
+  grep -Fq 'title: Prompting best practices' "$cache_dir/anthropic-prompting.md"
 
-  run "$helper" claude-opus-5-5
+  run "$helper" anthropic
   [ "$status" -eq 0 ]
-  [[ "$output" == *'cached claude-opus-5-5 last validated at'* ]]
-  age_cache claude-opus-5-5 86401
+  [[ "$output" == *'cached anthropic last validated at'* ]]
+  age_cache anthropic 86401
 
-  run "$helper" claude-opus-5-5
+  run "$helper" anthropic
   [ "$status" -eq 0 ]
-  [[ "$output" == *'fetched claude-opus-5-5'* ]]
+  [[ "$output" == *'fetched anthropic'* ]]
   [ "$(cat "$fake_state/count")" -eq 2 ]
   run grep -Fq 'If-' "$fake_state/requests"
   [ "$status" -eq 1 ]
 }
 
 @test 'atomically replaces changed content and metadata' {
-  run "$helper" gpt-6.1-sol
+  run "$helper" openai
   [ "$status" -eq 0 ]
 
-  age_cache gpt-6.1-sol 86401
+  age_cache openai 86401
   export FAKE_CURL_MODE=updated
-  run "$helper" gpt-6.1-sol
+  run "$helper" openai
   [ "$status" -eq 0 ]
-  [[ "$output" == *'fetched gpt-6.1-sol'* ]]
-  grep -Fq 'version=v2' "$cache_dir/gpt-6.1-sol-prompting.md"
-  grep -Fq 'etag="v2"' "$cache_dir/gpt-6.1-sol.meta"
+  [[ "$output" == *'fetched openai'* ]]
+  grep -Fq 'version=v2' "$cache_dir/openai-prompting.md"
+  grep -Fq 'etag="v2"' "$cache_dir/openai.meta"
 }
 
 @test 'uses a recently validated cache after retrieval failure' {
-  run "$helper" gpt-6.1-sol
+  run "$helper" openai
   [ "$status" -eq 0 ]
-  age_cache gpt-6.1-sol 86401
+  age_cache openai 86401
 
   export FAKE_CURL_MODE=failure
-  run "$helper" gpt-6.1-sol
+  run "$helper" openai
   [ "$status" -eq 0 ]
-  [[ "$output" == *'stale gpt-6.1-sol'* ]]
-  [[ "$output" == *"$cache_dir/gpt-6.1-sol-prompting.md"* ]]
+  [[ "$output" == *'stale openai'* ]]
+  [[ "$output" == *"$cache_dir/openai-prompting.md"* ]]
 }
 
 @test 'rejects expired fallback entries and forced-refresh failures' {
-  run "$helper" gpt-6.1-sol
+  run "$helper" openai
   [ "$status" -eq 0 ]
-  age_cache gpt-6.1-sol 604900
+  age_cache openai 604900
 
   export FAKE_CURL_MODE=failure
-  run "$helper" gpt-6.1-sol
+  run "$helper" openai
   [ "$status" -ne 0 ]
   [[ "$output" == *'no cache validated within seven days'* ]]
 
   export FAKE_CURL_MODE=normal
-  run "$helper" gpt-6.1-sol
+  run "$helper" openai
   [ "$status" -eq 0 ]
   export FAKE_CURL_MODE=failure
-  run "$helper" --refresh gpt-6.1-sol
+  run "$helper" --refresh openai
   [ "$status" -ne 0 ]
-  [[ "$output" == *'forced refresh failed for gpt-6.1-sol'* ]]
+  [[ "$output" == *'forced refresh failed for openai'* ]]
 }
 
 @test 'fails closed on invalid content or an unexpected redirect' {
-  run "$helper" gpt-6.1-sol
+  run "$helper" openai
   [ "$status" -eq 0 ]
-  original_checksum=$(cksum "$cache_dir/gpt-6.1-sol-prompting.md")
+  original_checksum=$(cksum "$cache_dir/openai-prompting.md")
 
   export FAKE_CURL_MODE=bad-content
-  run "$helper" --refresh gpt-6.1-sol
+  run "$helper" --refresh openai
   [ "$status" -ne 0 ]
   [[ "$output" == *'retrieved invalid content'* ]]
-  [ "$original_checksum" = "$(cksum "$cache_dir/gpt-6.1-sol-prompting.md")" ]
+  [ "$original_checksum" = "$(cksum "$cache_dir/openai-prompting.md")" ]
 
   export FAKE_CURL_MODE=bad-url
-  run "$helper" --refresh gpt-6.1-sol
+  run "$helper" --refresh openai
   [ "$status" -ne 0 ]
   [[ "$output" == *'refused unexpected final URL'* ]]
-  [ "$original_checksum" = "$(cksum "$cache_dir/gpt-6.1-sol-prompting.md")" ]
+  [ "$original_checksum" = "$(cksum "$cache_dir/openai-prompting.md")" ]
 }
 
 @test 'recovers from an unconditional 304 with one full retry' {
   export FAKE_CURL_MODE=recover-304
-  run "$helper" gpt-6.1-sol
+  run "$helper" openai
   [ "$status" -eq 0 ]
-  [[ "$output" == *'fetched gpt-6.1-sol'* ]]
+  [[ "$output" == *'fetched openai'* ]]
   [ "$(cat "$fake_state/count")" -eq 2 ]
 }
 
 @test 'serializes concurrent writers' {
   export FAKE_CURL_MODE=slow
-  "$helper" gpt-6.1-sol >"$test_root/first.out" 2>"$test_root/first.err" &
+  "$helper" openai >"$test_root/first.out" 2>"$test_root/first.err" &
   first_pid=$!
   sleep 0.1
-  "$helper" gpt-6.1-sol >"$test_root/second.out" 2>"$test_root/second.err" &
+  "$helper" openai >"$test_root/second.out" 2>"$test_root/second.err" &
   second_pid=$!
 
   wait "$first_pid"
@@ -356,8 +356,8 @@ age_cache() {
   [ "$first_rc" -eq 0 ]
   [ "$second_rc" -eq 0 ]
   [ "$(cat "$fake_state/count")" -eq 1 ]
-  grep -Fq 'version=v1' "$cache_dir/gpt-6.1-sol-prompting.md"
-  grep -Fq 'cached gpt-6.1-sol' "$test_root/second.err"
+  grep -Fq 'version=v1' "$cache_dir/openai-prompting.md"
+  grep -Fq 'cached openai' "$test_root/second.err"
 }
 
 @test 'rejects unknown artifacts' {
