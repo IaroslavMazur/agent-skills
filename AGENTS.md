@@ -188,6 +188,7 @@ the instructions change how a helper is used. Markdown changes always follow the
 - Bash scripts must be compatible with Bash v3.2 (`/bin/bash`) because macOS ships that system version and skills may
   run in Bash-based environments.
 - Keep generated docs terse, imperative, and expert-to-expert.
-- Never leak personal crypto (EVM) addresses in any skill. Use well-known public addresses or the standard Etherscan doc
-  example (`0xde0B295669a9FD93d5F28D9Ec85E40f4cb697BAe`). Never use a real user, maintainer, or personal wallet address.
-  For private keys, mnemonics, and API keys, use env-var placeholders (`$ETH_PRIVATE_KEY`). Never use literal secrets.
+- Do not leak personal crypto (EVM) addresses in any skill. Use well-known public addresses or the standard Etherscan
+  doc example (`0xde0B295669a9FD93d5F28D9Ec85E40f4cb697BAe`). Do not use a real user, maintainer, or personal wallet
+  address. For private keys, mnemonics, and API keys, use env-var placeholders (`$ETH_PRIVATE_KEY`). Never use literal
+  secrets.
