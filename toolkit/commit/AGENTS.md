@@ -12,16 +12,17 @@ repository model.
 - `src/commit.rs` runs configured validation without the shared index lock, then locks the shared index, re-verifies the
   branch head, runs hooks/signing, CAS-updates refs, and reconciles the shared index.
 - `src/push.rs` implements fetch-first, no-integration pushes.
-- `src/coord.rs` is the only `ai-coord` subprocess boundary: bounded advisory `baseline` and `trailer` reads, and the
-  explicit `finding resolve` call that `commit --finding` requests.
+- `src/coord.rs` is the only `ai-coord` subprocess boundary: bounded advisory `baseline`, `scope`, and `trailer` reads,
+  and the explicit `finding resolve` call that `commit --finding` requests.
 - `src/state.rs` owns atomic journal records, receipts, retention, and transaction refs.
 - `src/git.rs` is the only subprocess boundary for Git operations.
 
 ## Invariants
 
 - `prepare` must never mutate the worktree, shared index, branch ref, or user configuration.
-- Automatic stale-dirt baselines are advisory. Malformed output or an unavailable/failing `ai-coord` must not fail
-  preparation. Explicit exclusions win by path. Staged capture never consults ambient coordination state.
+- Automatic stale-dirt baselines and the unclaimed-path disclosure are advisory. Malformed output or an
+  unavailable/failing `ai-coord` must not fail preparation. Explicit exclusions win by path. Staged capture never
+  consults ambient coordination state.
 
   Preparation skips and discloses an automatic baseline whose path is in neither HEAD nor the worktree. Any other
   automatic baseline failure names its ai-coord origin and the `--no-auto-baseline`/`--exclude-baseline` overrides.
@@ -144,6 +145,11 @@ available, `ai-coord trailer` contributes one validated `Agent-Session:` line to
 and `--all` modes, `prepare` also asks `ai-coord baseline` for stale-dirt baselines. In those modes, it automatically
 excludes the pre-existing portions of those files.
 
+In default and `--all` modes, `prepare` also asks `ai-coord scope` for this session's active claim. When the claim
+exists, every prepared path outside it is disclosed as `UNCLAIMED<tab>path` (ordinary output: `unclaimed paths`). An
+exact scope covers only its path. A recursive scope covers its directory tree. No active claim, no `ai-coord`, or full
+coverage prints nothing. The disclosure never changes the prepared tree or the exit status.
+
 Explicit `--exclude-baseline` values take precedence for the same path. Use `--no-auto-baseline` to disable ambient
 discovery while retaining explicit exclusions. `--staged` always skips discovery because it captures the index exactly.
 An automatic baseline whose path exists in neither HEAD nor the worktree has nothing to exclude. Preparation skips it
@@ -246,9 +252,9 @@ discard it.
 `prepare --porcelain` emits stable TSV records. Tabs, newlines, carriage returns, and backslashes inside fields are
 backslash-escaped. Outcome records use `PREPARED`, `VALIDATED`, `VALIDATION_SKIPPED`, `COMMITTED`, `INTEGRATED`,
 `SUPERSEDED`, `REBASED`, `PUSHED`, `PUSHED_NEW`, `BEHIND`, `HOOK_ADDED`, `FINDING_RESOLVED`, `FINDING_UNRESOLVED`, and
-`DISCARDED`. Each automatically applied exclusion is disclosed as `AUTO_BASELINE<tab>path<tab>oid`. The ordinary output
-lists the same pairs under `auto-applied baselines`. Each skipped automatic baseline is disclosed as
-`AUTO_BASELINE_SKIPPED<tab>path<tab>oid`.
+`DISCARDED`. Each prepared path outside the active claim is disclosed as `UNCLAIMED<tab>path`. Each automatically
+applied exclusion is disclosed as `AUTO_BASELINE<tab>path<tab>oid`. The ordinary output lists the same pairs under
+`auto-applied baselines`. Each skipped automatic baseline is disclosed as `AUTO_BASELINE_SKIPPED<tab>path<tab>oid`.
 
 Receipts and retryable diagnostics print a fixed 12-character commit OID abbreviation. `show` and the transaction
 journal retain full OIDs. The `--diff full` display diff omits binary patch payloads and caps each file's section at 400

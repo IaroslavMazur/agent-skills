@@ -70,6 +70,7 @@ pub fn run(args: PrepareArgs, store: &Store) -> Result<()> {
     if paths.is_empty() {
         return Err(AppError::usage("prepared transaction has no changes"));
     }
+    let unclaimed = if args.staged { Vec::new() } else { unclaimed_paths(&repository.root, &paths) };
 
     let name_status = repository.text(
         [
@@ -156,7 +157,7 @@ pub fn run(args: PrepareArgs, store: &Store) -> Result<()> {
         let _ = repository.delete_refs(&transaction.references());
         return Err(error);
     }
-    print_prepared(&transaction, args.porcelain, full_diff.as_deref(), &diff_truncations, &baselines);
+    print_prepared(&transaction, args.porcelain, full_diff.as_deref(), &diff_truncations, &baselines, &unclaimed);
     Ok(())
 }
 
@@ -450,6 +451,38 @@ fn parse_baselines(repository: &Repository, args: &PrepareArgs, intended_paths: 
     Ok(baselines)
 }
 
+/// Advisory: prepared paths outside this session's active ai-coord claim. Empty when ai-coord is
+/// unavailable, the session has no active claim here, or every path is covered.
+fn unclaimed_paths(repository_root: &Path, paths: &[String]) -> Vec<String> {
+    let Some(bytes) = coord::bounded(repository_root, "scope", 64 * 1024, coord::BASELINE_TIMEOUT) else {
+        return Vec::new();
+    };
+    let Ok(text) = String::from_utf8(bytes) else {
+        return Vec::new();
+    };
+    let scopes: Vec<(&str, bool)> = text
+        .lines()
+        .filter_map(|line| {
+            let (path, kind) = line.split_once('\t')?;
+            match kind {
+                "exact" if !path.is_empty() => Some((path, false)),
+                "recursive" if !path.is_empty() => Some((path, true)),
+                _ => None,
+            }
+        })
+        .collect();
+    if scopes.is_empty() {
+        return Vec::new();
+    }
+    let covered = |path: &str| {
+        scopes.iter().any(|(scope, recursive)| {
+            path == *scope ||
+                (*recursive && (*scope == "." || path.strip_prefix(scope).is_some_and(|rest| rest.starts_with('/'))))
+        })
+    };
+    paths.iter().filter(|path| !covered(path)).cloned().collect()
+}
+
 fn bounded_baselines(repository_root: &Path) -> Vec<(String, String)> {
     let Some(bytes) = coord::bounded(repository_root, "baseline", 64 * 1024, coord::BASELINE_TIMEOUT) else {
         return Vec::new();
@@ -717,6 +750,7 @@ fn print_prepared(
     full_diff: Option<&str>,
     diff_truncations: &[(String, usize)],
     baselines: &[Baseline],
+    unclaimed: &[String],
 ) {
     if porcelain {
         println!("PREPARED\t{}", transaction.id);
@@ -730,6 +764,9 @@ fn print_prepared(
         for baseline in baselines.iter().filter(|baseline| baseline.automatic) {
             let record = if baseline.skipped { "AUTO_BASELINE_SKIPPED" } else { "AUTO_BASELINE" };
             println!("{record}\t{}\t{}", escape_tsv(&baseline.path), baseline.oid);
+        }
+        for path in unclaimed {
+            println!("UNCLAIMED\t{}", escape_tsv(path));
         }
         println!("BRANCH\t{}", escape_tsv(&transaction.branch));
         for line in transaction.name_status.lines() {
@@ -768,6 +805,12 @@ fn print_prepared(
         println!("\n## skipped auto baselines (path not in HEAD or the worktree)");
         for baseline in skipped {
             println!("{}={}", baseline.path, baseline.oid);
+        }
+    }
+    if !unclaimed.is_empty() {
+        println!("\n## unclaimed paths (outside this session's active ai-coord claim)");
+        for path in unclaimed {
+            println!("{path}");
         }
     }
     println!("\n## branch\n{}", transaction.branch);

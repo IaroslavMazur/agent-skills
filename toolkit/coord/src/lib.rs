@@ -196,6 +196,13 @@ async fn execute(cli: Cli) -> Result<u8> {
             }
             Ok(0)
         }
+        Command::Scope => {
+            for scope in Coordinator::open_default()?.scopes()? {
+                let kind = if scope.is_recursive() { "recursive" } else { "exact" };
+                println!("{}\t{kind}", scope.path);
+            }
+            Ok(0)
+        }
         Command::Touched => {
             let touched = Coordinator::open_default()?.touched(&std::env::current_dir()?)?;
             if touched.truncated {

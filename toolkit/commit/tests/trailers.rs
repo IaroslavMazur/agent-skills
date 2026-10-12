@@ -153,3 +153,43 @@ fn close_and_finding_values_are_validated() {
     }
     assert_eq!(harness.git(["log", "-1", "--format=%s"]), "base");
 }
+
+#[test]
+fn prepare_discloses_paths_outside_the_active_claim_only_when_a_claim_exists() {
+    let harness = Harness::new("unclaimed");
+    let log = harness.root.join("coord.log");
+    harness.write("intended.txt", "base\n");
+    harness.write("docs/guide.md", "base\n");
+    harness.write("other.txt", "base\n");
+    harness.commit_all("base");
+    harness.write("intended.txt", "changed\n");
+    harness.write("docs/guide.md", "changed\n");
+    harness.write("other.txt", "changed\n");
+
+    write_executable(
+        &harness.shim.join("ai-coord"),
+        &format!(
+            "#!/bin/sh\necho \"$1\" >> '{}'\nif [ \"$1\" = scope ]; then printf 'docs\\trecursive\\nintended.txt\\texact\\n'; \
+             exit 0; fi\nexit 1\n",
+            log.display()
+        ),
+    );
+    let (_, porcelain) = harness.prepare(&["intended.txt", "docs/guide.md", "other.txt"]);
+    assert!(porcelain.contains("UNCLAIMED\tother.txt\n"), "{porcelain}");
+    assert_eq!(porcelain.matches("UNCLAIMED\t").count(), 1, "{porcelain}");
+    let ordinary = stdout(&harness.success(["prepare", "--", "other.txt"]));
+    assert!(
+        ordinary.contains("## unclaimed paths (outside this session's active ai-coord claim)\nother.txt\n"),
+        "{ordinary}"
+    );
+
+    harness.git(["add", "other.txt"]);
+    fs::write(&log, "").unwrap();
+    let staged = stdout(&harness.success(["prepare", "--porcelain", "--staged"]));
+    assert!(!staged.contains("UNCLAIMED"), "{staged}");
+    assert!(!fs::read_to_string(&log).unwrap().contains("scope"), "--staged must not consult the claim");
+
+    write_executable(&harness.shim.join("ai-coord"), "#!/bin/sh\nif [ \"$1\" = scope ]; then exit 0; fi\nexit 1\n");
+    let (_, no_claim) = harness.prepare(&["other.txt"]);
+    assert!(!no_claim.contains("UNCLAIMED"), "{no_claim}");
+}

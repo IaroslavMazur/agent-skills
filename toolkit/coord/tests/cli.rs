@@ -333,6 +333,9 @@ fn baseline_and_touched_outputs_preserve_sorted_machine_contracts() {
     let touched = fixture.output_as("machine-output-host", &["touched"]);
     touched.assert().success();
     assert_eq!(String::from_utf8_lossy(&touched.stdout), "!TRUNCATED\nsrc/a.rs\nsrc/z.rs\n");
+    let scope = fixture.output_as("machine-output-host", &["scope"]);
+    scope.assert().success();
+    assert_eq!(String::from_utf8_lossy(&scope.stdout), "src/app.rs\texact\n");
 
     let _ = host.kill();
     let _ = host.wait();

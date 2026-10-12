@@ -544,6 +544,29 @@ impl Coordinator {
         Ok(Vec::new())
     }
 
+    /// Sorted scopes of this session's active claim in the current worktree, or empty when none is
+    /// active. Mirrors `baselines`: a bundle that does not claim this root is an error.
+    pub(crate) fn scopes(&self) -> Result<Vec<Scope>> {
+        let identity = self.required_identity()?;
+        let root = git_root(&resolved(&std::env::current_dir()?))
+            .ok_or_else(|| AppError::operational("scope requires a Git worktree"))?;
+        let repo_root = path_text(&root)?;
+        let Some(work) = self.store()?.work(&identity)?.filter(|work| work.state == WorkState::Active) else {
+            return Ok(Vec::new());
+        };
+        if let Some(claim) = work.claim(&repo_root) {
+            let mut scopes = claim.scopes.clone();
+            scopes.sort_by(|left, right| left.path.cmp(&right.path));
+            return Ok(scopes);
+        }
+        if work.claims.len() > 1 {
+            return Err(AppError::operational(format!(
+                "active repository bundle does not claim {repo_root}; run scope from a claimed repository"
+            )));
+        }
+        Ok(Vec::new())
+    }
+
     pub(crate) fn touched(&self, cwd: &Path) -> Result<TouchedPaths> {
         let identity = self.required_identity()?;
         let root = git_root(cwd).ok_or_else(|| AppError::operational("touched requires a Git worktree"))?;

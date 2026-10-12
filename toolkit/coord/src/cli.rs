@@ -35,6 +35,8 @@ pub(crate) enum Command {
     Done(DoneArgs),
     /// Print Git blob baselines for this session's active work.
     Baseline,
+    /// Print this session's active claim scopes in the current Git worktree.
+    Scope,
     /// Print repository-relative paths written by this session's observed tool calls.
     Touched,
     /// Show sessions, work, provider coverage, and repository findings.
