@@ -39,6 +39,9 @@ struct Destination {
     branch: String,
     remote: String,
     remote_branch: String,
+    /// The remote-tracking ref that fetching `remote` updates. `None` for a URL remote, such as
+    /// the fork URL that `gh pr checkout` configures, whose fetched head is compared by OID.
+    tracking_ref: Option<String>,
     compare_ref: Option<String>,
     new_branch: bool,
     set_upstream: bool,
@@ -48,8 +51,7 @@ pub fn execute(repository: &Repository, rebase: bool) -> Result<PushOutcome> {
     let branch = repository.branch()?;
     repository.head()?;
     let mut destination = destination(repository, &branch)?;
-    fetch(repository, &destination.remote)?;
-    destination.compare_ref = refreshed_compare_ref(repository, &destination)?;
+    destination.compare_ref = fetch(repository, &destination)?;
     if destination.set_upstream {
         destination.new_branch = destination.compare_ref.is_none();
     }
@@ -73,8 +75,7 @@ pub fn execute(repository: &Repository, rebase: bool) -> Result<PushOutcome> {
         return Err(git_error(first));
     }
 
-    fetch(repository, &destination.remote)?;
-    destination.compare_ref = refreshed_compare_ref(repository, &destination)?;
+    destination.compare_ref = fetch(repository, &destination)?;
     if destination.set_upstream {
         destination.new_branch = destination.compare_ref.is_none();
     }
@@ -97,64 +98,85 @@ pub fn execute(repository: &Repository, rebase: bool) -> Result<PushOutcome> {
     Ok(success_outcome(destination, rebased))
 }
 
+/// Resolves the push destination from the branch configuration. A configured `branch.<name>.remote`
+/// is authoritative even when it is a URL; only a branch without one falls back to `origin`. A
+/// differently named upstream branch is accepted only when `branch.<name>.pushRemote` names the same
+/// remote, which `gh pr checkout` writes for a PR head such as a fork's `main`.
 fn destination(repository: &Repository, branch: &str) -> Result<Destination> {
-    let branch_ref = format!("refs/heads/{branch}");
-    let compare_ref = repository.text(["for-each-ref", "--format=%(upstream)", &branch_ref], None)?;
-    if !compare_ref.is_empty() {
-        let remote_key = format!("branch.{branch}.remote");
-        let merge_key = format!("branch.{branch}.merge");
-        let remote = repository.text(["config", "--get", &remote_key], None)?;
-        let merge = repository.text(["config", "--get", &merge_key], None)?;
-        let remote_branch = merge
-            .strip_prefix("refs/heads/")
-            .ok_or_else(|| AppError::usage(format!("unsupported upstream merge ref: {merge}")))?
-            .to_owned();
-        if remote_branch != branch {
-            return Err(AppError::usage(format!(
-                "upstream {remote}/{remote_branch} does not match current branch {branch}; ai-commit push refuses to \
-                 move a differently named ref; push explicitly with `git push {remote} HEAD:refs/heads/{remote_branch}`"
-            )));
+    let Some(remote) = config(repository, &format!("branch.{branch}.remote"))? else {
+        let remote_exists = repository.raw(["remote", "get-url", "origin"], None)?;
+        if !remote_exists.status.success() {
+            return Err(AppError::usage(format!("branch {branch} has no upstream and remote 'origin' does not exist")));
         }
         return Ok(Destination {
             branch: branch.to_owned(),
-            remote,
-            remote_branch,
-            compare_ref: Some(compare_ref),
-            new_branch: false,
-            set_upstream: false,
+            remote: "origin".to_owned(),
+            remote_branch: branch.to_owned(),
+            tracking_ref: Some(format!("refs/remotes/origin/{branch}")),
+            compare_ref: None,
+            new_branch: true,
+            set_upstream: true,
         });
+    };
+    let merge = config(repository, &format!("branch.{branch}.merge"))?.ok_or_else(|| {
+        AppError::usage(format!("branch {branch} sets remote {remote} without branch.{branch}.merge"))
+    })?;
+    let remote_branch = merge
+        .strip_prefix("refs/heads/")
+        .ok_or_else(|| AppError::usage(format!("unsupported upstream merge ref: {merge}")))?
+        .to_owned();
+    let push_remote = config(repository, &format!("branch.{branch}.pushRemote"))?;
+    if remote_branch != branch && push_remote.as_deref() != Some(remote.as_str()) {
+        return Err(AppError::usage(format!(
+            "upstream {remote}/{remote_branch} does not match current branch {branch}; ai-commit push refuses to \
+             move a differently named ref unless the branch confirms it as its push target; if {remote}/{remote_branch} \
+             is the intended destination, such as a PR head, run `git config branch.{branch}.pushRemote {remote}`"
+        )));
     }
-
-    let remote_exists = repository.raw(["remote", "get-url", "origin"], None)?;
-    if !remote_exists.status.success() {
-        return Err(AppError::usage(format!("branch {branch} has no upstream and remote 'origin' does not exist")));
-    }
+    let branch_ref = format!("refs/heads/{branch}");
+    let upstream = repository.text(["for-each-ref", "--format=%(upstream)", &branch_ref], None)?;
     Ok(Destination {
         branch: branch.to_owned(),
-        remote: "origin".to_owned(),
-        remote_branch: branch.to_owned(),
+        remote,
+        remote_branch,
+        tracking_ref: (!upstream.is_empty()).then_some(upstream),
         compare_ref: None,
-        new_branch: true,
-        set_upstream: true,
+        new_branch: false,
+        set_upstream: false,
     })
 }
 
-fn fetch(repository: &Repository, remote: &str) -> Result<()> {
-    let output = repository.raw(["fetch", "--quiet", remote], None)?;
-    if output.status.success() { Ok(()) } else { Err(git_error(output)) }
+fn config(repository: &Repository, key: &str) -> Result<Option<String>> {
+    let output = repository.raw(["config", "--get", key], None)?;
+    match output.status.code() {
+        Some(0) => Ok(Some(String::from_utf8_lossy(&output.stdout).trim_end().to_owned())),
+        Some(1) => Ok(None),
+        _ => Err(git_error(output)),
+    }
 }
 
-fn refreshed_compare_ref(repository: &Repository, destination: &Destination) -> Result<Option<String>> {
-    let reference = if destination.set_upstream {
-        format!("refs/remotes/{}/{}", destination.remote, destination.remote_branch)
-    } else if let Some(compare_ref) = &destination.compare_ref {
-        compare_ref.clone()
-    } else {
-        return Ok(None);
+/// Fetches the destination and returns the ref or OID to compare HEAD against, or `None` when the
+/// remote branch does not exist yet.
+fn fetch(repository: &Repository, destination: &Destination) -> Result<Option<String>> {
+    let Some(tracking_ref) = &destination.tracking_ref else {
+        // A URL remote has no remote-tracking ref. Read the fetched OID from the porcelain record
+        // instead of the shared FETCH_HEAD file, which concurrent fetches can overwrite.
+        let source = format!("refs/heads/{}", destination.remote_branch);
+        let fetched = repository.text(["fetch", "--porcelain", &destination.remote, &source], None)?;
+        let oid = fetched
+            .lines()
+            // `<flag> <old-oid> <new-oid> <local-ref>`, where the flag can itself be a space.
+            .find_map(|line| line.rsplit(' ').nth(1))
+            .ok_or_else(|| AppError::operational(format!("cannot parse fetch result: {fetched}")))?;
+        return Ok(Some(oid.to_owned()));
     };
-    let output = repository.raw(["show-ref", "--verify", "--quiet", &reference], None)?;
+    let output = repository.raw(["fetch", "--quiet", &destination.remote], None)?;
+    if !output.status.success() {
+        return Err(git_error(output));
+    }
+    let output = repository.raw(["show-ref", "--verify", "--quiet", tracking_ref], None)?;
     match output.status.code() {
-        Some(0) => Ok(Some(reference)),
+        Some(0) => Ok(Some(tracking_ref.clone())),
         Some(1) => Ok(None),
         _ => Err(git_error(output)),
     }

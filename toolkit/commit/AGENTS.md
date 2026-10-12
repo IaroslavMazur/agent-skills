@@ -248,6 +248,14 @@ repository was left safe but needs a retry or reconciliation. Other Git, hook, s
 Pushes always fetch and compare first. Without `--rebase`, they never pull, merge, or rebase. A behind branch prints
 `BEHIND <branch> <count>` and exits `3`.
 
+The push destination is the configured upstream, `branch.<name>.remote` and `branch.<name>.merge`. The remote can be a
+URL, such as the fork URL that `gh pr checkout` writes. For a URL remote, ai-commit fetches the upstream branch and
+compares against the fetched OID from `git fetch --porcelain`, because no remote-tracking ref exists. ai-commit pushes
+to a differently named upstream branch only when `branch.<name>.pushRemote` equals `branch.<name>.remote`, as for a PR
+checkout. Otherwise ai-commit refuses the push with exit `2`, so a branch that only tracks `origin/main` never moves
+`main`. Only a branch without a configured remote falls back to `origin`, with `--set-upstream` and the local branch
+name.
+
 With `--rebase` (`push --rebase`, or `commit --push --rebase`), a behind branch is rebased onto its fetched upstream
 before the push attempt, under two conditions: no Git operation is in progress, and `git status` reports a clean working
 tree and index. Untracked files count as dirt. Ignored files do not. The rebase runs with `--no-autostash`. When it

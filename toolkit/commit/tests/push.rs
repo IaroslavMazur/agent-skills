@@ -104,7 +104,7 @@ fn standalone_push_refuses_a_differently_named_upstream() {
     let message = stderr(&refused);
     assert!(message.contains("origin/main"), "{message}");
     assert!(message.contains("fix"), "{message}");
-    assert!(message.contains("git push"), "{message}");
+    assert!(message.contains("git config branch.fix.pushRemote origin"), "{message}");
     assert_eq!(git_at(&remote, &harness.home, ["rev-parse", "refs/heads/main"]), remote_before);
     assert_eq!(harness.git(["rev-parse", "HEAD"]), local_before);
 }
@@ -132,6 +132,84 @@ fn commit_push_refuses_a_differently_named_upstream_without_moving_the_remote() 
     assert!(stdout(&refused).contains("COMMITTED"), "{}", stdout(&refused));
     assert_eq!(git_at(&remote, &harness.home, ["rev-parse", "refs/heads/main"]), remote_before);
     assert_eq!(harness.git(["show", "HEAD:intended.txt"]), "fix work");
+}
+
+/// Repository whose `pr-1` branch has the configuration `gh pr checkout --branch pr-1` writes for a
+/// fork PR: the fork URL as remote and pushRemote, merging the fork's `main`. Returns the origin and
+/// fork remotes.
+fn fork_pr_fixture(name: &str) -> (Harness, std::path::PathBuf, std::path::PathBuf) {
+    let harness = Harness::new(name);
+    let origin = harness.root.join("origin.git");
+    let fork = harness.root.join("fork.git");
+    init_bare(&origin, &harness.home);
+    init_bare(&fork, &harness.home);
+    harness.write("intended.txt", "base\n");
+    harness.commit_all("base");
+    harness.git(["branch", "-M", "main"]);
+    harness.git(["remote", "add", "origin", &format!("file://{}", origin.display())]);
+    harness.git(["push", "--quiet", "-u", "origin", "HEAD"]);
+    let fork_url = format!("file://{}", fork.display());
+    harness.git(["push", "--quiet", &fork_url, "HEAD:refs/heads/main"]);
+    harness.git(["switch", "--quiet", "-c", "pr-1"]);
+    harness.git(["config", "branch.pr-1.remote", &fork_url]);
+    harness.git(["config", "branch.pr-1.pushRemote", &fork_url]);
+    harness.git(["config", "branch.pr-1.merge", "refs/heads/main"]);
+    (harness, origin, fork)
+}
+
+#[test]
+fn fork_pr_checkout_pushes_to_the_pr_head_without_changing_tracking() {
+    let (harness, origin, fork) = fork_pr_fixture("push-fork-pr");
+    harness.write("intended.txt", "pr work\n");
+    harness.commit_all("pr work");
+    let config_before = harness.git(["config", "--get-regexp", "^branch\\.pr-1\\."]);
+
+    let pushed = harness.success(["push"]);
+
+    assert_eq!(stdout(&pushed), "PUSHED pr-1\n");
+    assert_eq!(harness.git(["rev-parse", "HEAD"]), git_at(&fork, &harness.home, ["rev-parse", "refs/heads/main"]));
+    assert!(harness.git(["ls-remote", "origin", "refs/heads/pr-1"]).is_empty());
+    assert_ne!(harness.git(["rev-parse", "HEAD"]), git_at(&origin, &harness.home, ["rev-parse", "refs/heads/main"]));
+    assert_eq!(harness.git(["config", "--get-regexp", "^branch\\.pr-1\\."]), config_before);
+}
+
+#[test]
+fn fork_pr_checkout_rebases_onto_the_fetched_pr_head() {
+    let (harness, _origin, fork) = fork_pr_fixture("push-fork-pr-rebase");
+    let contributor = harness.root.join("contributor");
+    clone_repository(&fork, &contributor, &harness.home);
+    fs::write(contributor.join("remote.txt"), "contributor\n").unwrap();
+    git_at(&contributor, &harness.home, ["add", "remote.txt"]);
+    git_at(&contributor, &harness.home, ["commit", "--quiet", "-m", "contributor"]);
+    git_at(&contributor, &harness.home, ["push", "--quiet"]);
+    harness.write("intended.txt", "pr work\n");
+    let (transaction, _) = harness.prepare(&["intended.txt"]);
+
+    let output = harness.success(["commit", &transaction, "-m", "test: pr work", "--push", "--rebase"]);
+
+    let receipt = stdout(&output);
+    assert!(receipt.contains("REBASED pr-1 1\n"), "{receipt}");
+    assert!(receipt.ends_with("PUSHED pr-1\n"), "{receipt}");
+    let head = harness.git(["rev-parse", "HEAD"]);
+    assert_eq!(git_at(&fork, &harness.home, ["rev-parse", "refs/heads/main"]), head);
+    assert_eq!(harness.read("remote.txt"), "contributor\n");
+}
+
+#[test]
+fn named_pr_remote_with_matching_push_remote_pushes_to_a_differently_named_head() {
+    let (harness, _origin, fork) = fork_pr_fixture("push-named-pr-remote");
+    harness.git(["remote", "add", "contributor", &format!("file://{}", fork.display())]);
+    harness.git(["fetch", "--quiet", "contributor"]);
+    harness.git(["branch", "--quiet", "--set-upstream-to=contributor/main", "pr-1"]);
+    harness.git(["config", "branch.pr-1.pushRemote", "contributor"]);
+    harness.write("intended.txt", "pr work\n");
+    harness.commit_all("pr work");
+
+    let pushed = harness.success(["push"]);
+
+    assert_eq!(stdout(&pushed), "PUSHED pr-1\n");
+    assert_eq!(harness.git(["rev-parse", "HEAD"]), git_at(&fork, &harness.home, ["rev-parse", "refs/heads/main"]));
+    assert_eq!(harness.git(["rev-parse", "--abbrev-ref", "@{upstream}"]), "contributor/main");
 }
 
 #[test]
