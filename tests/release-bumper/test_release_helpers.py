@@ -183,6 +183,10 @@ class ChangelogTests(unittest.TestCase):
         self.assertTrue(any("repeat" in error or "order" in error for error in errors))
         self.assertTrue(validator.validate(text, "2.0.0", "2026-07-22", "release-2.0.0"))
         self.assertTrue(validator.validate(text.replace("[2.0.0]", "2.0.0", 1), "2.0.0", "2026-07-22", None))
+        compare = text.replace("releases/tag/v2.0.0", "compare/v1.0.0...v2.0.0", 1)
+        self.assertEqual(validator.validate(compare, "2.0.0", "2026-07-22", "v2.0.0"), [])
+        self.assertEqual(validator.validate(compare, "2.0.0", "2026-07-22", None), [])
+        self.assertTrue(validator.validate(compare, "2.0.0", "2026-07-22", "v2.0.1"))
 
     def test_accepts_wrapped_items_and_rejects_nested_lists(self) -> None:
         text = """# Changelog
