@@ -34,7 +34,9 @@ export function RepoLane({ lane, now }: RepoLaneProps) {
     >
       <div className="flex flex-col gap-3 border-b border-line bg-surface-muted p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
-          <FolderGit2 aria-hidden="true" className="size-5 shrink-0 text-muted" strokeWidth={1.7} />
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-accent/15 bg-accent-wash text-accent">
+            <FolderGit2 aria-hidden="true" className="size-5" strokeWidth={1.7} />
+          </span>
           <div className="min-w-0">
             <h3
               className="truncate text-[17px]/6 font-semibold tracking-tight"

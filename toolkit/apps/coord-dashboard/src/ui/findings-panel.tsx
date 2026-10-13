@@ -1,5 +1,5 @@
 import { Collapsible } from "@base-ui/react/collapsible";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ClipboardCheck } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 
@@ -168,7 +168,15 @@ export function FindingsPanel({ findings, now }: FindingsPanelProps) {
     <section aria-labelledby="findings-heading" className="min-w-0">
       <div className="flex flex-col gap-5">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight" id="findings-heading">
+          <h2
+            className="flex items-center gap-2 text-xl font-semibold tracking-tight"
+            id="findings-heading"
+          >
+            <ClipboardCheck
+              aria-hidden="true"
+              className="size-4 shrink-0 text-accent"
+              strokeWidth={1.8}
+            />
             Findings
           </h2>
           <p className="mt-1 text-sm/5 text-muted">

@@ -1,4 +1,4 @@
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, MessageSquareText } from "lucide-react";
 import { AnimatePresence } from "motion/react";
 
 import { orderMessages } from "@/lib/messages.js";
@@ -25,6 +25,11 @@ export function MessagesPreview({ messages, now, onOpenMessages }: MessagesPrevi
     >
       <div className="flex items-center justify-between gap-3 bg-surface-muted px-4 py-3">
         <h2 id="messages-preview-heading" className="flex items-center gap-2 text-sm font-semibold">
+          <MessageSquareText
+            aria-hidden="true"
+            className="size-4 shrink-0 text-accent"
+            strokeWidth={1.8}
+          />
           Latest messages
         </h2>
         <AnimatedValue className="text-[11px] text-muted tabular-nums" value={unreadCount}>

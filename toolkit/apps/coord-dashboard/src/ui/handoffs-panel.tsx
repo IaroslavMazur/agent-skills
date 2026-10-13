@@ -1,5 +1,5 @@
 import rehypeShiki from "@shikijs/rehype";
-import { FolderGit2, RefreshCw } from "lucide-react";
+import { FileText, FolderGit2, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ComponentProps, ReactNode } from "react";
 import { MarkdownHooks } from "react-markdown";
@@ -180,7 +180,8 @@ function HandoffArticle({ handoff }: { handoff: HandoffRecord }) {
 function StatusMessage({ children, title }: { children: ReactNode; title: string }) {
   return (
     <div className="border-y border-line bg-surface px-4 py-12 text-center">
-      <h3 className="text-sm font-semibold">{title}</h3>
+      <FileText aria-hidden="true" className="mx-auto size-6 text-muted" strokeWidth={1.5} />
+      <h3 className="mt-3 text-sm font-semibold">{title}</h3>
       <div className="mx-auto mt-1 max-w-md text-xs/5 text-muted">{children}</div>
     </div>
   );
@@ -238,7 +239,15 @@ export function HandoffsPanel() {
     <section aria-labelledby="handoffs-heading" className="min-w-0">
       <div className="flex flex-col gap-5">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight" id="handoffs-heading">
+          <h2
+            className="flex items-center gap-2 text-xl font-semibold tracking-tight"
+            id="handoffs-heading"
+          >
+            <FileText
+              aria-hidden="true"
+              className="size-4 shrink-0 text-accent"
+              strokeWidth={1.8}
+            />
             Handoffs
           </h2>
           <p className="mt-1 text-sm/5 text-muted">

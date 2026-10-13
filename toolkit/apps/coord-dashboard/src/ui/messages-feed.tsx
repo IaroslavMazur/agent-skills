@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, ListFilter, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, ListFilter, MessageSquareText, Search } from "lucide-react";
 import { AnimatePresence } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { tv } from "tailwind-variants";
@@ -66,7 +66,15 @@ export function MessagesFeed({ messages, now }: MessagesFeedProps) {
   return (
     <section aria-labelledby="messages-heading" className="min-w-0 scroll-mt-4" ref={resultsRef}>
       <div className="flex items-center justify-between gap-3">
-        <h2 id="messages-heading" className="text-xl font-semibold tracking-tight">
+        <h2
+          id="messages-heading"
+          className="flex items-center gap-2 text-xl font-semibold tracking-tight"
+        >
+          <MessageSquareText
+            aria-hidden="true"
+            className="size-4 shrink-0 text-accent"
+            strokeWidth={1.8}
+          />
           Messages
         </h2>
         <AnimatedValue className="text-xs text-muted tabular-nums" value={messages.length}>
@@ -139,7 +147,8 @@ export function MessagesFeed({ messages, now }: MessagesFeedProps) {
         {messagePage.items.length === 0 ? (
           <div className="flex min-h-56 items-center justify-center border-y border-line-muted px-4 text-center">
             <div>
-              <p className="text-sm font-medium">
+              <Search aria-hidden="true" className="mx-auto size-5 text-muted" />
+              <p className="mt-3 text-sm font-medium">
                 {messages.length === 0
                   ? "No coordination messages"
                   : "No messages match these filters"}

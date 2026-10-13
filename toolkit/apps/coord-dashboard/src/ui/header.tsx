@@ -65,7 +65,35 @@ export function Header({
   ];
 
   return (
-    <header className="border-b border-line bg-surface">
+    <header className="relative isolate overflow-hidden border-b border-line bg-surface">
+      <svg
+        aria-hidden="true"
+        className="pointer-events-none absolute top-0 right-0 -z-1 h-60 w-[min(65rem,85%)] mask-[linear-gradient(to_right,transparent,black_35%)] text-accent opacity-15 sm:opacity-20"
+        fill="none"
+        focusable="false"
+        preserveAspectRatio="xMaxYMid slice"
+        viewBox="0 0 1000 240"
+      >
+        <g stroke="currentColor" strokeWidth="1">
+          <path d="M0 54H290C345 54 345 114 400 114H1000" />
+          <path d="M120 188H355C410 188 410 114 465 114" />
+          <path d="M220 14H510C565 14 565 74 620 74H1000" />
+          <path d="M465 114H650C705 114 705 188 760 188H1000" />
+          <path d="M600 240V210C600 154 655 154 655 114" />
+          <path d="M760 188C815 188 815 74 870 74" />
+          <path d="M755 0V24C755 74 810 74 810 114" />
+        </g>
+        <g fill="var(--color-surface-base)" stroke="currentColor" strokeWidth="2">
+          <circle cx="290" cy="54" r="4" />
+          <circle cx="400" cy="114" r="5" />
+          <circle cx="510" cy="14" r="4" />
+          <circle cx="620" cy="74" r="5" />
+          <circle cx="655" cy="114" r="5" />
+          <circle cx="760" cy="188" r="5" />
+          <circle cx="870" cy="74" r="4" />
+          <circle cx="950" cy="114" r="4" />
+        </g>
+      </svg>
       <div className="mx-auto max-w-[1520px] px-4 pt-5 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-3 pb-5">
           <div className="flex items-center gap-3">

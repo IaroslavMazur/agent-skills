@@ -12,8 +12,8 @@ const errorContent = tv({
 
 export function EmptySessions() {
   return (
-    <div className="border-y border-line bg-surface px-4 py-12 text-center">
-      <span className="mx-auto flex size-10 items-center justify-center text-muted">
+    <div className="rounded-lg border border-line-strong bg-surface px-4 py-12 text-center">
+      <span className="mx-auto flex size-12 items-center justify-center rounded-xl bg-accent-wash text-accent">
         <RadioTower aria-hidden="true" className="size-6" strokeWidth={1.5} />
       </span>
       <h3 className="mt-3 text-base font-semibold">No live agent sessions</h3>
