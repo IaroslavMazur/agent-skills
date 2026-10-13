@@ -23,7 +23,7 @@ use crate::{
         ScopeKind, SessionState, WorkState,
     },
     error::Result,
-    host::{ClaudeSessionObservation, WorkClaimRequest, git_blob_hashes, git_dirty_paths},
+    host::{ClaudeSessionObservation, WorkClaimRequest, git_blob_hashes, git_dirty_paths, git_last_commit_times},
     state::{BaselineRow, DraftClaimUpdate, DraftOwner, SessionUpdate, Store, WorkClaimUpdate, WorkUpdate},
     work::{DIRT_HOLD_SECONDS, WorkCoordinator},
 };
@@ -1140,6 +1140,109 @@ fn confirmed_death_releases_residual_ownership_recorded_by_done() {
     assert!(store.session(&holder).unwrap().is_none());
     assert!(store.residual_owners(repo_root).unwrap().is_empty());
     assert_eq!(store.work(&successor).unwrap().unwrap().state, WorkState::Active);
+}
+
+fn git_stdout(root: &Path, args: &[&str], committed_at: u64) -> String {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(args)
+        .env("GIT_COMMITTER_DATE", format!("{committed_at} +0000"))
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&output.stderr));
+    String::from_utf8(output.stdout).unwrap().trim().to_owned()
+}
+
+/// Commit `content` for `path` at `committed_at` through the index only, like a
+/// partial `git add -p` commit: the working-tree blob, and so its dirt
+/// observation, stays unchanged.
+fn commit_index_only(root: &Path, path: &str, content: &str, committed_at: u64) {
+    let staged = root.parent().unwrap().join("staged.txt");
+    fs::write(&staged, content).unwrap();
+    let oid = git_stdout(root, &["hash-object", "-w", staged.to_str().unwrap()], committed_at);
+    git_stdout(root, &["update-index", "--add", "--cacheinfo", &format!("100644,{oid},{path}")], committed_at);
+    git_stdout(root, &["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", path], committed_at);
+}
+
+const RESIDUAL_RELEASED_AT: u64 = 1_700_000_000;
+
+/// A live holder that finished with uncommitted `tracked.txt` at
+/// `RESIDUAL_RELEASED_AT`, as seen by a successor once the dirt hold elapsed.
+fn residual_holder_fixture(commit_before_done: bool) -> (TempDir, Vec<PathBuf>, Coordinator) {
+    let released_at = RESIDUAL_RELEASED_AT as f64;
+    let holder = identity("holder");
+    let successor = identity("successor");
+    let (temp, roots) = repos(1);
+    fs::write(roots[0].join("tracked.txt"), "base").unwrap();
+    commit_index_only(&roots[0], "tracked.txt", "base", RESIDUAL_RELEASED_AT - 100);
+    let mut store = Store::open(temp.path().join("state.db")).unwrap();
+    let probe = Arc::new(FakeProbe::default());
+    for (identity, pid) in [(&holder, 160), (&successor, 161)] {
+        add_session(&mut store, identity, &roots[0], pid, 1.0);
+        probe.set(pid, ProcessLiveness::Alive);
+    }
+    let clock = Arc::new(FakeClock::new(released_at));
+    let coordinator = Coordinator::with_components(
+        store,
+        Box::new(StaticInventory { complete: true, refreshes: Arc::new(AtomicUsize::new(0)) }),
+        probe as Arc<dyn ProcessProbe>,
+        Arc::clone(&clock) as Arc<dyn Clock>,
+    );
+    let requested = files(&roots, &["tracked.txt"]);
+    assert_eq!(
+        coordinator.start_for(holder.clone(), "holder", &requested, &[], &roots[0]).unwrap().kind,
+        OutcomeKind::Ready
+    );
+    fs::write(roots[0].join("tracked.txt"), "dirty").unwrap();
+    if commit_before_done {
+        commit_index_only(&roots[0], "tracked.txt", "partial", RESIDUAL_RELEASED_AT - 50);
+    }
+    assert_eq!(coordinator.done_for(&holder, &roots[0]).unwrap().holders, ["tracked.txt"]);
+    *clock.value.lock().unwrap() = released_at + DIRT_HOLD_SECONDS;
+    let blocked = coordinator.start_for(successor, "successor", &requested, &[], &roots[0]).unwrap();
+    assert_eq!(blocked.kind, OutcomeKind::Blocked);
+    assert_eq!(blocked.holders, ["codex/holder"]);
+    (temp, roots, coordinator)
+}
+
+#[test]
+fn commit_after_done_releases_residual_ownership_for_peers() {
+    let (_temp, roots, coordinator) = residual_holder_fixture(false);
+    let repo_root = roots[0].to_str().unwrap();
+    commit_index_only(&roots[0], "tracked.txt", "partial", RESIDUAL_RELEASED_AT + 1);
+
+    let requested = files(&roots, &["tracked.txt"]);
+    let ready = coordinator.start_for(identity("successor"), "successor", &requested, &[], &roots[0]).unwrap();
+    assert_eq!(ready.kind, OutcomeKind::Ready);
+    assert_eq!(ready.detail, "stale-dirt:tracked.txt");
+    let store = coordinator.store().unwrap();
+    assert!(store.residual_owners(repo_root).unwrap().is_empty());
+    assert!(store.session(&identity("holder")).unwrap().is_some());
+}
+
+#[test]
+fn commit_before_done_keeps_residual_ownership() {
+    let (_temp, roots, coordinator) = residual_holder_fixture(true);
+    let repo_root = roots[0].to_str().unwrap();
+
+    let requested = files(&roots, &["tracked.txt"]);
+    let blocked = coordinator.start_for(identity("successor"), "successor", &requested, &[], &roots[0]).unwrap();
+    assert_eq!(blocked.kind, OutcomeKind::Blocked);
+    assert_eq!(blocked.holders, ["codex/holder"]);
+    assert_eq!(coordinator.store().unwrap().residual_owners(repo_root).unwrap()[0].identity, identity("holder"));
+}
+
+#[test]
+fn last_commit_times_cover_only_committed_paths() {
+    let (_temp, roots) = repos(1);
+    fs::write(roots[0].join("untracked.txt"), "new").unwrap();
+    let paths = ["committed.txt".to_owned(), "untracked.txt".to_owned(), "missing.txt".to_owned()];
+    assert!(git_last_commit_times(&roots[0], &paths).is_empty());
+
+    fs::write(roots[0].join("committed.txt"), "base").unwrap();
+    commit_index_only(&roots[0], "committed.txt", "base", RESIDUAL_RELEASED_AT);
+    assert_eq!(git_last_commit_times(&roots[0], &paths), [("committed.txt".to_owned(), RESIDUAL_RELEASED_AT as f64)]);
 }
 
 #[test]

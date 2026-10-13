@@ -14,8 +14,8 @@ use crate::{
     domain::{Identity, Scope, ScopeKind, WorkState},
     error::{AppError, Result},
     host::{
-        UNHASHABLE_BLOB_HASH, WorkClaimRequest, any_overlap, git_blob_hashes, git_dirty_paths, normalize_scopes,
-        overlaps_outside_coverage, relevant_dirty, scopes_cover, scopes_overlap,
+        UNHASHABLE_BLOB_HASH, WorkClaimRequest, any_overlap, git_blob_hashes, git_dirty_paths, git_last_commit_times,
+        normalize_scopes, overlaps_outside_coverage, relevant_dirty, scopes_cover, scopes_overlap,
     },
     state::{BaselineRow, DirtObservationRow, ResidualOwnerRow, Store, WorkRow},
 };
@@ -107,6 +107,29 @@ fn gather_evidence(
             Err(error) => Err(error),
         })
         .collect()
+}
+
+/// Per repository root, the last commit time of each residual-attributed dirty path.
+type CommittedResiduals = Vec<(String, Vec<(String, f64)>)>;
+
+/// Last commit time of each dirty path that still carries residual attribution,
+/// read outside the work transaction so Git inspection never holds the lock.
+fn committed_residuals(store: &Store, evidence: &[RepoEvidence]) -> Result<CommittedResiduals> {
+    let mut committed = Vec::new();
+    for item in evidence.iter().filter(|item| item.inspection.is_none()) {
+        let paths = store
+            .residual_owners(&item.repo_root)?
+            .into_iter()
+            .map(|row| row.path)
+            .filter(|path| item.dirty.contains(path))
+            .collect::<Vec<_>>();
+        let times =
+            if paths.is_empty() { Vec::new() } else { git_last_commit_times(Path::new(&item.repo_root), &paths) };
+        if !times.is_empty() {
+            committed.push((item.repo_root.clone(), times));
+        }
+    }
+    Ok(committed)
 }
 
 fn blockers(

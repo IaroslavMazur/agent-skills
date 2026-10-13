@@ -6,8 +6,8 @@ use std::{
 };
 
 use super::{
-    DIRT_HOLD_SECONDS, RepoEvidence, WorkCoordinator, blockers, evidence_for, existing_claim_scopes,
-    expansion_blockers, foreign_residuals, gather_evidence, merge_baselines,
+    CommittedResiduals, DIRT_HOLD_SECONDS, RepoEvidence, WorkCoordinator, blockers, committed_residuals, evidence_for,
+    existing_claim_scopes, expansion_blockers, foreign_residuals, gather_evidence, merge_baselines,
     messages::{MAX_MESSAGE_CHARS, conflict_detail, notify_contenders},
     output_path, partition_dirty, path_text, request_paths, request_work_overlap, require_ordinary_item,
     same_claim_vector, same_work_vectors, soft, unattributed_dirty, validate_claim_vector, work_in_repo, work_paths,
@@ -127,6 +127,7 @@ impl WorkCoordinator<'_> {
             return self.update_active(identity, label, claims, inventory, active, submission, current);
         }
         let evidence = gather_evidence(&claims, existing.as_ref(), claims.len() > 1)?;
+        let committed = committed_residuals(self.store, &evidence)?;
         let mut submitted_at = existing
             .as_ref()
             .filter(|work| {
@@ -153,6 +154,7 @@ impl WorkCoordinator<'_> {
                 };
                 let work = transaction.works()?;
                 let observations = refresh_observations(transaction, &evidence, current)?;
+                release_committed_residuals(transaction, &committed)?;
                 let residuals = read_residuals(transaction, &claims)?;
                 let mut evaluations = evaluate_claims(
                     &claims,
@@ -273,6 +275,7 @@ impl WorkCoordinator<'_> {
         }
         let narrowing = work_vector_covers_requests(existing, &claims);
         let evidence = gather_evidence(&claims, Some(existing), qualified)?;
+        let committed = committed_residuals(self.store, &evidence)?;
         let mut attempted_baselines = HashMap::<String, HashSet<String>>::new();
         let mut prepared_baselines = HashMap::<String, Vec<BaselineRow>>::new();
         loop {
@@ -282,6 +285,7 @@ impl WorkCoordinator<'_> {
                 verify_draft(transaction, submission)?;
                 let work = transaction.works()?;
                 let observations = refresh_observations(transaction, &evidence, current)?;
+                release_committed_residuals(transaction, &committed)?;
                 let residuals =
                     read_residuals_for_roots(transaction, evidence.iter().map(|item| item.repo_root.as_str()))?;
                 if let Some(inspection) = evidence.iter().find(|item| item.inspection.is_some()) {
@@ -432,6 +436,12 @@ fn refresh_observations(
                 .map(|observations| (item.repo_root.clone(), observations))
         })
         .collect()
+}
+fn release_committed_residuals(transaction: &WorkTransaction<'_>, committed: &CommittedResiduals) -> Result<()> {
+    for (repo_root, times) in committed {
+        transaction.release_committed_residuals(repo_root, times)?;
+    }
+    Ok(())
 }
 fn read_residuals(
     transaction: &WorkTransaction<'_>,

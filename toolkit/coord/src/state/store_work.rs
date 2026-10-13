@@ -162,6 +162,23 @@ impl WorkTransaction<'_> {
         record_residual_owners_from(&self.transaction, repo_root, paths, identity, current)
     }
 
+    /// Release residual attribution for paths committed after it was recorded.
+    /// A later commit means the owner's uncommitted work is gone or superseded,
+    /// so the leftover dirt degrades to ordinary stale dirt.
+    pub(crate) fn release_committed_residuals(&self, repo_root: &str, committed: &[(String, f64)]) -> Result<usize> {
+        let mut released = 0;
+        for (path, committed_at) in committed {
+            released += self.transaction.execute(
+                "DELETE FROM residual_owners WHERE repo_root = ?1 AND path = ?2 AND released_at < ?3",
+                params![repo_root, path, committed_at],
+            )?;
+        }
+        if released > 0 {
+            bump_generation(&self.transaction)?;
+        }
+        Ok(released)
+    }
+
     pub(crate) fn delete_work(&self, identity: &Identity) -> Result<bool> {
         let removed = self.transaction.execute(
             "DELETE FROM work_items WHERE client = ?1 AND session_id = ?2",

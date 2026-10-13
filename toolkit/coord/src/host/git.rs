@@ -573,6 +573,23 @@ pub(crate) fn git_head_oid(root: &Path) -> Option<String> {
     (!oid.is_empty()).then(|| oid.to_owned())
 }
 
+/// Last committer time per path, omitting paths without a readable commit.
+pub(crate) fn git_last_commit_times(root: &Path, paths: &[String]) -> Vec<(String, f64)> {
+    paths
+        .iter()
+        .filter_map(|path| {
+            let mut command = Command::new("git");
+            command.arg("--literal-pathspecs").arg("-C").arg(root).args(["log", "-1", "--format=%ct", "--", path]);
+            let output = run_output_timeout(&mut command, GIT_INSPECTION_TIMEOUT).ok()?;
+            if !output.status.success() {
+                return None;
+            }
+            let time = std::str::from_utf8(&output.stdout).ok()?.trim().parse::<f64>().ok()?;
+            Some((path.clone(), time))
+        })
+        .collect()
+}
+
 pub(crate) fn relevant_dirty(scopes: &[Scope], dirty_paths: &[String]) -> Vec<String> {
     dirty_paths
         .iter()
