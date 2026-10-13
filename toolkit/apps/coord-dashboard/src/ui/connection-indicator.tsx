@@ -19,7 +19,7 @@ const indicator = tv({
         dot: "liveness-fresh bg-positive",
       },
       polling: {
-        root: "text-warning",
+        root: "text-warning-ink",
         dot: "bg-warning",
       },
       disconnected: {

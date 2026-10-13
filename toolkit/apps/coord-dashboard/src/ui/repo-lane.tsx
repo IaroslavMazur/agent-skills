@@ -20,7 +20,7 @@ export function RepoLane({ lane, now }: RepoLaneProps) {
   return (
     <motion.section
       animate={{ opacity: 1, y: 0 }}
-      className="min-w-0 overflow-hidden rounded-2xl border border-line bg-surface shadow-panel"
+      className="min-w-0 border-y border-line bg-surface"
       data-motion-item
       exit={{ opacity: 0, y: -8 }}
       initial={{ opacity: 0, y: 10 }}
@@ -32,21 +32,22 @@ export function RepoLane({ lane, now }: RepoLaneProps) {
         layout: { duration: MOTION_DURATION.layout, ease: MOTION_EASE },
       }}
     >
-      <div className="flex flex-col gap-3 border-b border-line bg-surface-muted/60 p-4 sm:px-5">
+      <div className="flex flex-col gap-3 border-b border-line py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-accent/15 bg-accent-wash text-accent">
-            <FolderGit2 aria-hidden="true" className="size-5" strokeWidth={1.7} />
-          </span>
+          <FolderGit2 aria-hidden="true" className="size-5 shrink-0 text-muted" strokeWidth={1.7} />
           <div className="min-w-0">
-            <h2 className="truncate text-base/6 font-semibold tracking-tight" title={lane.repoRoot}>
+            <h3
+              className="truncate text-[17px]/6 font-semibold tracking-tight"
+              title={lane.repoRoot}
+            >
               {lane.repoRoot.split("/").findLast(Boolean) ?? lane.repoRoot}
-            </h2>
-            <p className="mt-0.5 truncate font-mono text-[11px]/4 text-muted" title={lane.repoRoot}>
+            </h3>
+            <p className="mt-0.5 truncate font-mono text-[12px]/4 text-muted" title={lane.repoRoot}>
               {displayPath(lane.repoRoot)}
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]/4 text-muted tabular-nums">
+        <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 text-[12px]/5 text-muted tabular-nums sm:max-w-[45%] sm:justify-end">
           <span>
             <AnimatedValue value={lane.sessions.length}>{lane.sessions.length}</AnimatedValue>{" "}
             session
@@ -61,20 +62,20 @@ export function RepoLane({ lane, now }: RepoLaneProps) {
             <AnimatedValue value={workCount}>{workCount}</AnimatedValue> work
             {workCount === 1 ? " item" : " items"}
           </span>
-          <span className="sm:ml-auto">
+          <span className="w-full sm:text-right">
             activity{" "}
             {lane.lastActivity === null ? "unknown" : formatRelativeTime(lane.lastActivity, now)}
           </span>
         </div>
       </div>
 
-      <div className="hidden grid-cols-[minmax(0,1.1fr)_7rem_minmax(0,1.6fr)] gap-4 border-b border-line-muted px-5 py-2 text-[10px]/4 font-medium tracking-wider text-muted uppercase md:grid">
+      <div className="hidden grid-cols-[minmax(0,1.1fr)_7rem_minmax(0,1.6fr)] gap-4 border-b border-line-muted py-2 pl-3 text-[11px]/4 font-medium tracking-wide text-muted uppercase md:grid">
         <span>Agent</span>
         <span>State</span>
         <span>Work scopes</span>
       </div>
 
-      <div className="px-4 sm:px-5">
+      <div>
         <AnimatePresence initial={false} mode="popLayout">
           {lane.sessions.map((row) => (
             <SessionRow
@@ -88,7 +89,7 @@ export function RepoLane({ lane, now }: RepoLaneProps) {
           {lane.unmatchedWork.map((work) => (
             <motion.div
               animate={{ opacity: 1, y: 0 }}
-              className="grid gap-3 border-t border-line-muted py-4 first:border-t-0 md:grid-cols-[minmax(0,1.1fr)_7rem_minmax(0,1.6fr)] md:items-start md:gap-4"
+              className="grid gap-3 border-t border-line-muted py-4 pl-3 first:border-t-0 md:grid-cols-[minmax(0,1.1fr)_7rem_minmax(0,1.6fr)] md:items-start md:gap-4"
               data-motion-item
               exit={{ opacity: 0, y: -6 }}
               initial={{ opacity: 0, y: 8 }}
@@ -104,11 +105,14 @@ export function RepoLane({ lane, now }: RepoLaneProps) {
               }}
             >
               <div className="min-w-0">
-                <p className="text-[13px]/5 font-medium wrap-anywhere" title={work.label}>
+                <p className="text-[14px]/5 font-medium wrap-anywhere" title={work.label}>
                   {work.label}
                 </p>
-                <p className="mt-1 font-mono text-[11px]/4 text-muted">
-                  Unreported session · {work.client}:{shortSessionId(work.session_id)}
+                <p className="mt-1 text-[12px]/5 wrap-anywhere text-muted">
+                  Unreported session ·{" "}
+                  <span className="font-mono">
+                    {work.client}:{shortSessionId(work.session_id)}
+                  </span>
                 </p>
               </div>
               <AnimatedValue className="text-xs font-medium text-muted" value={work.state}>
@@ -123,7 +127,7 @@ export function RepoLane({ lane, now }: RepoLaneProps) {
       </div>
 
       {lane.drafts.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-2 border-t border-line-muted bg-surface-muted/40 px-4 py-3 sm:px-5">
+        <div className="flex flex-wrap items-center gap-3 border-t border-line-muted py-3 pl-3">
           <AnimatePresence initial={false} mode="popLayout">
             {lane.drafts.map((laneDraft) => (
               <motion.div
@@ -146,7 +150,7 @@ export function RepoLane({ lane, now }: RepoLaneProps) {
         {workCount === 0 && lane.drafts.length === 0 ? (
           <motion.p
             animate={{ opacity: 1 }}
-            className="border-t border-line-muted bg-surface-muted/30 px-4 py-3 text-xs text-muted sm:px-5"
+            className="border-t border-line-muted py-3 pl-3 text-[13px] text-muted"
             data-motion-item
             exit={{ opacity: 0 }}
             initial={{ opacity: 0 }}

@@ -8,12 +8,14 @@ import type { Message } from "@/lib/types.js";
 import { AnimatedValue } from "@/ui/animated-value.js";
 
 const messageDot = tv({
-  base: "absolute top-4 -left-0.5 size-1.5 rounded-full transition-colors",
+  base: "size-1.5 shrink-0 rounded-full transition-colors motion-reduce:transition-none",
   variants: { acknowledged: { true: "bg-muted", false: "bg-accent" } },
 });
 const messageText = tv({
-  base: "mt-2 text-[13px]/5 wrap-anywhere text-ink-secondary",
-  variants: { compact: { true: "line-clamp-3", false: "wrap-break-word whitespace-pre-wrap" } },
+  base: "mt-2 text-sm/6 wrap-anywhere text-ink-secondary",
+  variants: {
+    compact: { true: "line-clamp-3 text-[13px]/5", false: "wrap-break-word whitespace-pre-wrap" },
+  },
 });
 
 type MessageRowProps = {
@@ -39,7 +41,7 @@ export function MessageRow({
   return (
     <motion.li
       animate={{ opacity: 1, y: 0 }}
-      className="relative border-t border-line-muted py-3 pl-3 first:border-t-0"
+      className="min-w-0 py-4"
       data-motion-item
       exit={{ opacity: 0, y: -6 }}
       initial={{ opacity: 0, y: 8 }}
@@ -50,19 +52,19 @@ export function MessageRow({
         layout: { duration: MOTION_DURATION.layout, ease: MOTION_EASE },
       }}
     >
-      <span className={messageDot({ acknowledged })} aria-hidden="true" />
-      <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[11px]/4">
+      <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs/5">
+        <span className={messageDot({ acknowledged })} aria-hidden="true" />
         <AnimatedValue className="min-w-0" value={senderLabel}>
-          <span className="block truncate font-semibold">{senderLabel}</span>
+          <span className="block font-semibold wrap-anywhere">{senderLabel}</span>
         </AnimatedValue>
         <ArrowRight aria-hidden="true" className="size-3 shrink-0 text-muted" />
         <AnimatedValue className="min-w-0" value={recipientLabel}>
-          <span className="block truncate">{recipientLabel}</span>
+          <span className="block wrap-anywhere">{recipientLabel}</span>
         </AnimatedValue>
       </div>
       {showRepository && message.repo_root ? (
         <p
-          className="mt-1 truncate font-mono text-[10px]/4 text-muted"
+          className="mt-1 truncate font-mono text-[11px]/5 text-muted"
           title={displayPath(message.repo_root)}
         >
           {shortenPath(message.repo_root)}
@@ -71,7 +73,7 @@ export function MessageRow({
       <p className={messageText({ compact })} title={compact ? message.text : undefined}>
         {message.text}
       </p>
-      <div className="mt-2 flex items-center justify-between gap-3 text-[10px]/4 text-muted">
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px]/5 text-muted">
         <span>{formatRelativeTime(message.created_at, now)}</span>
         <AnimatedValue value={acknowledged}>
           <span className="inline-flex items-center gap-1">

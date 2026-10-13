@@ -1,5 +1,5 @@
 import rehypeShiki from "@shikijs/rehype";
-import { FileText, FolderGit2, RefreshCw } from "lucide-react";
+import { FolderGit2, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ComponentProps, ReactNode } from "react";
 import { MarkdownHooks } from "react-markdown";
@@ -73,7 +73,7 @@ function HandoffIndex({
         title={`${group.root}/${group.repository}`}
       >
         <FolderGit2 aria-hidden="true" className="size-3.5 shrink-0 text-muted" strokeWidth={1.8} />
-        <span className="shrink-0 font-semibold text-ink">{group.repository}</span>
+        <span className="min-w-0 font-semibold wrap-anywhere text-ink">{group.repository}</span>
         <span className="min-w-0 truncate font-mono text-[11px] text-muted">
           {displayPath(group.root)}
         </span>
@@ -87,18 +87,18 @@ function HandoffIndex({
             <li className="border-b border-line-muted last:border-b-0" key={handoff.path}>
               <button
                 aria-current={selected ? "page" : undefined}
-                className="grid min-h-11 w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-surface-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent aria-[current=page]:bg-accent-wash aria-[current=page]:shadow-[inset_2px_0_0_var(--color-accent)] motion-reduce:transition-none"
+                className="grid min-h-11 w-full grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2 gap-y-1 border-l-2 border-transparent p-3 text-left transition-colors hover:bg-surface-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent aria-[current=page]:border-accent aria-[current=page]:bg-accent-wash motion-reduce:transition-none"
                 onClick={() => onSelect(handoff.path)}
                 title={`${category} · ${handoff.title}`}
                 type="button"
               >
                 <CategoryDot category={handoff.category} />
-                <span className="truncate text-[13px] font-medium text-ink">
+                <span className="text-[13px]/5 font-medium wrap-anywhere text-ink">
                   <span className="sr-only">{category}: </span>
                   {handoff.title}
                 </span>
                 <time
-                  className="text-[11px] whitespace-nowrap text-muted tabular-nums"
+                  className="col-start-2 text-[11px]/4 whitespace-nowrap text-muted tabular-nums"
                   dateTime={handoff.modifiedAt}
                 >
                   {formatHandoffDate(handoff.modifiedAt)}
@@ -146,7 +146,7 @@ function HandoffArticle({ handoff }: { handoff: HandoffRecord }) {
           {categoryLabel(handoff.category)}
         </p>
         <h2
-          className="mt-2 text-xl/tight font-semibold tracking-tight text-balance wrap-break-word"
+          className="mt-2 text-xl/7 font-semibold tracking-tight wrap-anywhere"
           id="handoff-title"
         >
           {handoff.title}
@@ -179,9 +179,8 @@ function HandoffArticle({ handoff }: { handoff: HandoffRecord }) {
 
 function StatusMessage({ children, title }: { children: ReactNode; title: string }) {
   return (
-    <div className="rounded-2xl border border-line bg-surface px-4 py-12 text-center">
-      <FileText aria-hidden="true" className="mx-auto size-6 text-muted" strokeWidth={1.5} />
-      <h3 className="mt-3 text-sm font-semibold">{title}</h3>
+    <div className="border-y border-line bg-surface px-4 py-12 text-center">
+      <h3 className="text-sm font-semibold">{title}</h3>
       <div className="mx-auto mt-1 max-w-md text-xs/5 text-muted">{children}</div>
     </div>
   );
@@ -237,34 +236,33 @@ export function HandoffsPanel() {
 
   return (
     <section aria-labelledby="handoffs-heading" className="min-w-0">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-5">
         <div>
-          <h2 className="flex items-center gap-2 text-base font-semibold" id="handoffs-heading">
-            <FileText aria-hidden="true" className="size-4 text-accent" strokeWidth={1.8} />
+          <h2 className="text-xl font-semibold tracking-tight" id="handoffs-heading">
             Handoffs
           </h2>
-          <p className="mt-1 text-xs/5 text-muted">
+          <p className="mt-1 text-sm/5 text-muted">
             Read-only task handoffs from ~/projects, ~/work, the Desktop, and the archive
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-1">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-y border-line py-2">
           <div aria-label="Handoff state" className="flex gap-1" role="group">
             {filters.map(({ id, label }) => (
               <button
                 aria-pressed={activeFilter === id}
-                className="flex min-h-9 items-center gap-2 rounded-lg border border-transparent px-2.5 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent aria-pressed:border-accent aria-pressed:bg-accent-wash aria-pressed:text-ink motion-reduce:transition-none"
+                className="flex min-h-9 items-center gap-2 rounded-md border border-transparent px-2.5 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent aria-pressed:bg-accent-wash aria-pressed:text-accent motion-reduce:transition-none"
                 key={id}
                 onClick={() => setFilter(id)}
                 type="button"
               >
                 {label}
-                <span className="font-mono text-[11px] tabular-nums">{counts[id]}</span>
+                <span className="text-[11px] tabular-nums">{counts[id]}</span>
               </button>
             ))}
           </div>
           <button
             aria-label="Rescan handoffs"
-            className="flex size-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transition-none"
+            className="flex size-9 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transition-none"
             onClick={() => setReloadSequence((sequence) => sequence + 1)}
             title="Rescan handoffs"
             type="button"
@@ -296,15 +294,15 @@ export function HandoffsPanel() {
           </StatusMessage>
         ) : null}
         {!loadError && handoffs && handoffs.length > 0 ? (
-          <div className="grid items-start gap-6 lg:grid-cols-[20rem_minmax(0,1fr)]">
+          <div className="grid items-start gap-6 lg:grid-cols-[19rem_minmax(0,1fr)]">
             <nav
               aria-label="Handoff index"
-              className="max-h-80 overflow-y-auto overscroll-contain rounded-2xl border border-line bg-surface shadow-panel lg:sticky lg:top-4 lg:max-h-[calc(100dvh-2rem)]"
+              className="max-h-80 overflow-y-auto overscroll-contain border-y border-line bg-surface lg:sticky lg:top-4 lg:max-h-[calc(100dvh-2rem)]"
             >
               <HandoffIndex groups={groups} onSelect={selectHandoff} selectedPath={selectedPath} />
             </nav>
             <div
-              className="min-w-0 scroll-mt-4 rounded-2xl border border-line bg-surface p-5 shadow-panel sm:p-8"
+              className="min-w-0 scroll-mt-4 border-t border-line bg-surface py-5 lg:border-t-0 lg:border-l lg:py-0 lg:pl-8"
               id="handoff-reader"
             >
               {selected ? (

@@ -15,7 +15,7 @@ import { AnimatedValue } from "@/ui/animated-value.js";
 import { WorkChips } from "@/ui/work-chips.js";
 
 const clientBadge = tv({
-  base: "inline-flex shrink-0 rounded-md border px-1.5 py-0.5 text-[10px]/3 font-semibold tracking-wide uppercase",
+  base: "inline-flex shrink-0 rounded-sm border px-1.5 py-0.5 text-[11px]/4 font-semibold",
   variants: {
     client: {
       codex: "border-codex-line bg-codex-subtle text-codex",
@@ -25,14 +25,14 @@ const clientBadge = tv({
   },
 });
 const sessionState = tv({
-  base: "inline-flex w-fit items-center rounded-md px-2 py-1 text-[11px]/4 font-medium",
+  base: "inline-flex w-fit items-center border-l-2 pl-2 text-[12px]/5 font-medium",
   variants: {
     state: {
-      working: "bg-active-subtle text-active-ink",
-      in_flight: "bg-active-subtle text-active-ink",
-      waiting: "bg-queued-subtle text-queued-ink",
-      idle: "bg-surface-muted text-muted",
-      unknown: "bg-surface-muted text-muted",
+      working: "border-active-line text-active-ink",
+      in_flight: "border-active-line text-active-ink",
+      waiting: "border-queued-line text-queued-ink",
+      idle: "border-line text-muted",
+      unknown: "border-line text-muted",
     },
   },
 });
@@ -75,17 +75,17 @@ function DelegateRow({ delegate, now }: { delegate: Delegate; now: number }) {
         layout: { duration: MOTION_DURATION.layout, ease: MOTION_EASE },
       }}
     >
-      <div className="flex min-w-0 items-center gap-2 text-xs text-muted">
+      <div className="flex min-w-0 items-center gap-2 text-[12px] text-muted">
         <GitBranch aria-hidden="true" className="size-3.5 shrink-0" />
         <LivenessDot lastSeen={delegate.last_seen} now={now} />
-        <span className="truncate font-mono" title={delegate.agent_id}>
+        <span className="min-w-0 font-mono wrap-anywhere" title={delegate.agent_id}>
           {delegate.agent_id}
         </span>
       </div>
       <AnimatedValue className="text-xs text-muted" value={delegate.state}>
         {delegate.state}
       </AnimatedValue>
-      <span className="text-xs text-muted">
+      <span className="text-[12px]/5 text-muted">
         Delegate · {delegate.agent_type ?? "unknown type"} · seen{" "}
         {formatRelativeTime(delegate.last_seen, now)}
       </span>
@@ -124,11 +124,11 @@ export function SessionRow({ row, repoRoot, now }: SessionRowProps) {
         layout: { duration: MOTION_DURATION.layout, ease: MOTION_EASE },
       }}
     >
-      <div className="grid gap-3 py-4 md:grid-cols-[minmax(0,1.1fr)_7rem_minmax(0,1.6fr)] md:items-start md:gap-4">
+      <div className="grid gap-3 py-4 pl-3 md:grid-cols-[minmax(0,1.1fr)_7rem_minmax(0,1.6fr)] md:items-start md:gap-4">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
             <LivenessDot lastSeen={session.last_seen} now={now} />
-            <AnimatedValue className="min-w-0 flex-1 text-[13px]/5 font-semibold" value={label}>
+            <AnimatedValue className="min-w-0 flex-1 text-[14px]/5 font-semibold" value={label}>
               <span className="block wrap-anywhere" title={label}>
                 {label}
               </span>
@@ -137,27 +137,30 @@ export function SessionRow({ row, repoRoot, now }: SessionRowProps) {
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-4">
             {session.permission_mode === "plan" ? (
-              <span className="inline-flex rounded-md border border-warning/40 bg-warning-subtle px-1.5 py-0.5 text-[10px]/3 font-semibold text-warning-ink">
+              <span className="inline-flex rounded-sm border border-warning/40 bg-warning-subtle px-1.5 py-0.5 text-[11px]/4 font-medium text-warning-ink">
                 planning
               </span>
             ) : null}
             {session.coordination_waived ? (
-              <span className="inline-flex rounded-md border border-accent/40 bg-accent-wash px-1.5 py-0.5 text-[10px]/3 font-semibold text-accent">
+              <span className="inline-flex rounded-sm border border-line bg-surface-muted px-1.5 py-0.5 text-[11px]/4 font-medium text-ink-secondary">
                 waived
               </span>
             ) : null}
-            <span className="font-mono text-[10px]/4 text-muted">
+            <span className="font-mono text-[11px]/4 text-muted">
               {shortSessionId(session.session_id)}
             </span>
           </div>
-          <div className="mt-1 flex min-w-0 flex-col gap-y-1 pl-4 text-xs/5 text-muted">
+          <div className="mt-1 flex min-w-0 flex-col gap-y-1 pl-4 text-[12px]/5 text-muted">
             {secondaryNames.map((name) => (
               <span className="wrap-anywhere" key={name} title={name}>
                 {name}
               </span>
             ))}
             {showCwd ? (
-              <span className="truncate font-mono text-[10px]/4" title={displayPath(session.cwd)}>
+              <span
+                className="font-mono text-[11px]/4 wrap-anywhere"
+                title={displayPath(session.cwd)}
+              >
                 cwd {displayPath(session.cwd)}
               </span>
             ) : null}
@@ -168,7 +171,7 @@ export function SessionRow({ row, repoRoot, now }: SessionRowProps) {
           <AnimatedValue className={sessionState({ state: session.state })} value={session.state}>
             {session.state}
           </AnimatedValue>
-          <span className="text-[10px]/4 text-muted">
+          <span className="text-[11px]/4 text-muted">
             seen {formatRelativeTime(session.last_seen, now)}
           </span>
         </div>
@@ -192,7 +195,7 @@ export function SessionRow({ row, repoRoot, now }: SessionRowProps) {
             ) : (
               <motion.span
                 animate={{ opacity: 1 }}
-                className="text-xs text-muted"
+                className="text-[13px] text-muted"
                 data-motion-item
                 exit={{ opacity: 0 }}
                 initial={{ opacity: 0 }}

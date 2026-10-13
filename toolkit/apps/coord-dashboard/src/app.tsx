@@ -26,7 +26,7 @@ const HandoffsPanel = lazy(async () => {
 const tabs = ["coordination", "findings", "messages", "handoffs"] as const;
 type Tab = (typeof tabs)[number];
 const navigationTab = tv({
-  base: "flex min-h-10 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-transparent px-1 py-2 text-[12px] font-medium text-muted transition-colors hover:bg-surface hover:text-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent data-active:border-line data-active:bg-surface data-active:text-ink data-active:shadow-sm motion-reduce:transition-none sm:gap-2 sm:px-4 sm:text-[13px]",
+  base: "flex min-h-12 shrink-0 cursor-pointer items-center gap-1.5 border-b-2 border-transparent px-1 py-3 text-[12px] font-medium whitespace-nowrap text-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent data-active:border-accent data-active:text-accent motion-reduce:transition-none sm:gap-2 sm:px-5 sm:text-[13px]",
 });
 
 function tabFromPath(pathname: string): Tab {
@@ -82,7 +82,7 @@ export function App() {
             snapshot={snapshot}
           />
 
-          <main className="mx-auto max-w-[1520px] px-4 py-6 sm:px-6 lg:px-8">
+          <main className="mx-auto max-w-[1520px] px-4 pt-2 pb-8 sm:px-6 lg:px-8">
             {connection === "disconnected" && error ? (
               <div className="pb-5">
                 <ApiErrorState compact={snapshot !== null} detail={error.message} />
@@ -96,7 +96,7 @@ export function App() {
               <Tabs.List
                 activateOnFocus
                 aria-label="Dashboard views"
-                className="mb-7 flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl border border-line bg-surface-muted p-1"
+                className="mb-7 flex w-full gap-0.5 overflow-x-auto border-b border-line sm:gap-2"
               >
                 <Tabs.Tab className={navigationTab()} value="coordination">
                   <PanelsTopLeft aria-hidden="true" className="hidden size-4 sm:block" />
@@ -107,7 +107,7 @@ export function App() {
                   Findings
                   <span
                     aria-label={`${unresolvedCount} unresolved findings`}
-                    className="min-w-5 rounded-md bg-accent-wash px-1.5 py-0.5 text-center text-[11px]/4 text-accent tabular-nums"
+                    className="min-w-5 rounded-sm bg-surface-muted px-1.5 py-0.5 text-center text-[11px]/4 text-ink-secondary tabular-nums"
                     title={`${unresolvedCount} unresolved findings (pending or handed off)`}
                   >
                     {unresolvedCount}
@@ -123,7 +123,7 @@ export function App() {
                 </Tabs.Tab>
               </Tabs.List>
               {snapshot === null && connection !== "disconnected" && activeTab !== "handoffs" ? (
-                <div className="rounded-2xl border border-line bg-surface px-4 py-12 text-center text-sm text-muted">
+                <div className="rounded-md border border-line bg-surface px-4 py-12 text-center text-sm text-muted">
                   Loading coordination snapshot…
                 </div>
               ) : null}
@@ -134,13 +134,21 @@ export function App() {
                     value="coordination"
                     className="focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
                   >
-                    <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+                    <div className="mb-5 flex flex-wrap items-end justify-between gap-2">
+                      <h2 className="text-[20px]/7 font-semibold tracking-tight">Coordination</h2>
+                      <p className="text-[13px]/5 text-muted">
+                        {snapshot.sessions.length} session
+                        {snapshot.sessions.length === 1 ? "" : "s"} across {lanes.length} repositor
+                        {lanes.length === 1 ? "y" : "ies"}
+                      </p>
+                    </div>
+                    <div className="grid items-start gap-7 xl:grid-cols-[minmax(0,1fr)_20rem]">
                       <div className="min-w-0">
                         {snapshot.sessions.length === 0 || lanes.length === 0 ? (
                           <EmptySessions />
                         ) : null}
                         {lanes.length > 0 ? (
-                          <div className="flex flex-col gap-5">
+                          <div className="flex flex-col gap-7">
                             <AnimatePresence initial={false} mode="popLayout">
                               {lanes.map((lane) => (
                                 <RepoLane key={lane.repoRoot} lane={lane} now={now} />

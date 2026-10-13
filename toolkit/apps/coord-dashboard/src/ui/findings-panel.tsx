@@ -1,5 +1,5 @@
 import { Collapsible } from "@base-ui/react/collapsible";
-import { ChevronDown, ClipboardCheck } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 
@@ -119,7 +119,7 @@ function FindingGroup({ group, now }: { group: FindingGroupModel; now: number })
   return (
     <motion.section
       animate={{ opacity: 1, y: 0 }}
-      className="min-w-0 overflow-hidden rounded-2xl border border-line bg-surface shadow-panel"
+      className="min-w-0 overflow-hidden border-y border-line bg-surface"
       data-motion-item
       exit={{ opacity: 0, y: -6 }}
       initial={{ opacity: 0, y: 6 }}
@@ -130,7 +130,7 @@ function FindingGroup({ group, now }: { group: FindingGroupModel; now: number })
         layout: { duration: MOTION_DURATION.layout, ease: MOTION_EASE },
       }}
     >
-      <div className="flex flex-col gap-2 border-b border-line bg-surface-muted px-4 py-3 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4 sm:px-5">
+      <div className="flex flex-col gap-2 border-b border-line bg-surface-muted px-4 py-2.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4 sm:px-5">
         <h3 className="min-w-0 font-mono text-xs/5 font-medium break-all text-ink-secondary">
           {displayPath(group.repoRoot)}
         </h3>
@@ -166,30 +166,30 @@ export function FindingsPanel({ findings, now }: FindingsPanelProps) {
 
   return (
     <section aria-labelledby="findings-heading" className="min-w-0">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-5">
         <div>
-          <h2 className="flex items-center gap-2 text-base font-semibold" id="findings-heading">
-            <ClipboardCheck aria-hidden="true" className="size-4 text-accent" strokeWidth={1.8} />
+          <h2 className="text-xl font-semibold tracking-tight" id="findings-heading">
             Findings
           </h2>
-          <p className="mt-1 text-xs/5 text-muted">
+          <p className="mt-1 text-sm/5 text-muted">
             {counts.unresolved} unresolved · {counts.triaging} triaging
           </p>
         </div>
-        <div aria-label="Finding state" className="flex flex-wrap gap-1" role="group">
+        <div
+          aria-label="Finding state"
+          className="flex flex-wrap gap-1 border-y border-line py-2"
+          role="group"
+        >
           {filters.map(({ id, label }) => (
             <button
               aria-pressed={filter === id}
-              className="flex min-h-9 items-center gap-2 rounded-lg border border-transparent px-2.5 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent aria-pressed:border-accent aria-pressed:bg-accent-wash aria-pressed:text-ink motion-reduce:transition-none"
+              className="flex min-h-9 items-center gap-2 rounded-md border border-transparent px-2.5 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent aria-pressed:bg-accent-wash aria-pressed:text-accent motion-reduce:transition-none"
               key={id}
               onClick={() => setFilter(id)}
               type="button"
             >
               {label}
-              <AnimatedValue
-                className="font-mono text-[11px] tabular-nums"
-                value={filterCounts[id]}
-              >
+              <AnimatedValue className="text-[11px] tabular-nums" value={filterCounts[id]}>
                 {filterCounts[id]}
               </AnimatedValue>
             </button>
@@ -197,12 +197,12 @@ export function FindingsPanel({ findings, now }: FindingsPanelProps) {
         </div>
       </div>
 
-      <p aria-live="polite" className="mt-5 text-xs/5 text-muted tabular-nums">
+      <p aria-live="polite" className="mt-4 text-xs/5 text-muted tabular-nums">
         {filterCounts[filter]} {filterCounts[filter] === 1 ? "finding" : "findings"} in{" "}
         {groups.length} {groups.length === 1 ? "repository" : "repositories"}
       </p>
       {groups.length === 0 ? (
-        <div className="mt-3 rounded-2xl border border-line bg-surface px-4 py-12 text-center">
+        <div className="mt-3 border-y border-line bg-surface px-4 py-12 text-center">
           <p className="text-sm font-medium">
             {counts.total === 0 ? emptyMessages.all : emptyMessages[filter]}
           </p>
@@ -221,7 +221,7 @@ export function FindingsPanel({ findings, now }: FindingsPanelProps) {
           )}
         </div>
       ) : (
-        <div className="mt-3 flex flex-col gap-5">
+        <div className="mt-3 flex flex-col gap-6">
           <AnimatePresence initial={false} mode="popLayout">
             {groups.map((group) => (
               <FindingGroup group={group} key={group.repoRoot} now={now} />
