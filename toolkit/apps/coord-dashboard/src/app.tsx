@@ -1,7 +1,7 @@
 import { Tabs } from "@base-ui/react/tabs";
 import { ClipboardCheck, FileText, MessageSquareText, PanelsTopLeft } from "lucide-react";
 import { AnimatePresence, LayoutGroup, MotionConfig } from "motion/react";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { tv } from "tailwind-variants";
 
@@ -14,6 +14,7 @@ import { ApiErrorState, EmptySessions } from "@/ui/empty-error-states.js";
 import { FindingsPanel } from "@/ui/findings-panel.js";
 import { Header } from "@/ui/header.js";
 import { MessagesFeed } from "@/ui/messages-feed.js";
+import { MessagesPreview } from "@/ui/messages-preview.js";
 import { RepoLane } from "@/ui/repo-lane.js";
 
 // Loaded on demand: Markdown rendering and syntax highlighting dominate the bundle.
@@ -43,6 +44,7 @@ export function App() {
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [refreshSequence, setRefreshSequence] = useState(0);
   const [now, setNow] = useState(() => Date.now() / 1000);
+  const messagesTabRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now() / 1000), 1000);
@@ -111,7 +113,7 @@ export function App() {
                     {unresolvedCount}
                   </span>
                 </Tabs.Tab>
-                <Tabs.Tab className={navigationTab()} value="messages">
+                <Tabs.Tab className={navigationTab()} ref={messagesTabRef} value="messages">
                   <MessageSquareText aria-hidden="true" className="hidden size-4 sm:block" />
                   Messages
                 </Tabs.Tab>
@@ -132,19 +134,30 @@ export function App() {
                     value="coordination"
                     className="focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
                   >
-                    <div className="min-w-0">
-                      {snapshot.sessions.length === 0 || lanes.length === 0 ? (
-                        <EmptySessions />
-                      ) : null}
-                      {lanes.length > 0 ? (
-                        <div className="flex flex-col gap-5">
-                          <AnimatePresence initial={false} mode="popLayout">
-                            {lanes.map((lane) => (
-                              <RepoLane key={lane.repoRoot} lane={lane} now={now} />
-                            ))}
-                          </AnimatePresence>
-                        </div>
-                      ) : null}
+                    <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+                      <div className="min-w-0">
+                        {snapshot.sessions.length === 0 || lanes.length === 0 ? (
+                          <EmptySessions />
+                        ) : null}
+                        {lanes.length > 0 ? (
+                          <div className="flex flex-col gap-5">
+                            <AnimatePresence initial={false} mode="popLayout">
+                              {lanes.map((lane) => (
+                                <RepoLane key={lane.repoRoot} lane={lane} now={now} />
+                              ))}
+                            </AnimatePresence>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <aside className="min-w-0 xl:sticky xl:top-6">
+                        <MessagesPreview
+                          messages={snapshot.messages}
+                          now={now}
+                          // activateOnFocus makes focusing the tab also select it and update the URL.
+                          onOpenMessages={() => messagesTabRef.current?.focus()}
+                        />
+                      </aside>
                     </div>
                   </Tabs.Panel>
                   <Tabs.Panel
