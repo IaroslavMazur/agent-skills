@@ -21,9 +21,9 @@ export function MessagesPreview({ messages, now, onOpenMessages }: MessagesPrevi
   return (
     <section
       aria-labelledby="messages-preview-heading"
-      className="flex flex-col overflow-hidden border-y border-line bg-surface xl:max-h-[calc(100dvh-3rem)]"
+      className="flex flex-col overflow-hidden rounded-lg border border-line-strong bg-surface xl:max-h-[calc(100dvh-3rem)]"
     >
-      <div className="flex items-center justify-between gap-3 px-4 py-3">
+      <div className="flex items-center justify-between gap-3 bg-surface-muted px-4 py-3">
         <h2 id="messages-preview-heading" className="flex items-center gap-2 text-sm font-semibold">
           Latest messages
         </h2>

@@ -20,7 +20,7 @@ export function RepoLane({ lane, now }: RepoLaneProps) {
   return (
     <motion.section
       animate={{ opacity: 1, y: 0 }}
-      className="min-w-0 border-y border-line bg-surface"
+      className="min-w-0 overflow-hidden rounded-lg border border-line-strong bg-surface"
       data-motion-item
       exit={{ opacity: 0, y: -8 }}
       initial={{ opacity: 0, y: 10 }}
@@ -32,7 +32,7 @@ export function RepoLane({ lane, now }: RepoLaneProps) {
         layout: { duration: MOTION_DURATION.layout, ease: MOTION_EASE },
       }}
     >
-      <div className="flex flex-col gap-3 border-b border-line py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5">
+      <div className="flex flex-col gap-3 border-b border-line bg-surface-muted p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
           <FolderGit2 aria-hidden="true" className="size-5 shrink-0 text-muted" strokeWidth={1.7} />
           <div className="min-w-0">
@@ -69,13 +69,13 @@ export function RepoLane({ lane, now }: RepoLaneProps) {
         </div>
       </div>
 
-      <div className="hidden grid-cols-[minmax(0,1.1fr)_7rem_minmax(0,1.6fr)] gap-4 border-b border-line-muted py-2 pl-3 text-[11px]/4 font-medium tracking-wide text-muted uppercase md:grid">
+      <div className="hidden grid-cols-[minmax(0,1.1fr)_7rem_minmax(0,1.6fr)] gap-4 border-b border-line-muted py-2 pr-4 pl-7 text-[11px]/4 font-medium tracking-wide text-muted uppercase sm:pr-5 sm:pl-8 md:grid">
         <span>Agent</span>
         <span>State</span>
         <span>Work scopes</span>
       </div>
 
-      <div>
+      <div className="px-4 sm:px-5">
         <AnimatePresence initial={false} mode="popLayout">
           {lane.sessions.map((row) => (
             <SessionRow
@@ -127,7 +127,7 @@ export function RepoLane({ lane, now }: RepoLaneProps) {
       </div>
 
       {lane.drafts.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-3 border-t border-line-muted py-3 pl-3">
+        <div className="flex flex-wrap items-center gap-3 border-t border-line-muted px-4 py-3 sm:px-5">
           <AnimatePresence initial={false} mode="popLayout">
             {lane.drafts.map((laneDraft) => (
               <motion.div
@@ -150,7 +150,7 @@ export function RepoLane({ lane, now }: RepoLaneProps) {
         {workCount === 0 && lane.drafts.length === 0 ? (
           <motion.p
             animate={{ opacity: 1 }}
-            className="border-t border-line-muted py-3 pl-3 text-[13px] text-muted"
+            className="border-t border-line-muted px-4 py-3 text-[13px] text-muted sm:px-5"
             data-motion-item
             exit={{ opacity: 0 }}
             initial={{ opacity: 0 }}

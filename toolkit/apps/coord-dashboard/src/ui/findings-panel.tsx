@@ -119,7 +119,7 @@ function FindingGroup({ group, now }: { group: FindingGroupModel; now: number })
   return (
     <motion.section
       animate={{ opacity: 1, y: 0 }}
-      className="min-w-0 overflow-hidden border-y border-line bg-surface"
+      className="min-w-0 overflow-hidden rounded-lg border border-line-strong bg-surface"
       data-motion-item
       exit={{ opacity: 0, y: -6 }}
       initial={{ opacity: 0, y: 6 }}
