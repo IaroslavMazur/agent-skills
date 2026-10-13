@@ -79,7 +79,8 @@ Treat visual structure as information architecture, not decoration.
   `scripts/` directory instead.
 - `toolkit/` is the Rust workspace and Bun apps that own the `ai-*` CLIs the skills and the global coordination workflow
   rely on. Follow `toolkit/AGENTS.md` there.
-- `README.md` lists every skill and stays minimal.
+- Keep the `README.md` skills table complete when skills are added, renamed, removed, or change purpose. Assign one
+  primary category per skill, reusing an existing category when it fits. Sort rows by category, then skill name.
 - Claude Code reads `AGENTS.md` directly. Do not add a `CLAUDE.md`.
 
 ## Commands
