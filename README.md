@@ -71,7 +71,7 @@ From a clone, `just toolkit::install-cli` installs the supported CLIs into `~/.l
 | brainstorm-with-me   | Productivity  | Co-create novel ideas and converge on a testable concept                  |
 | grill-me             | Productivity  | Relentlessly stress-test plans and designs                                |
 | interview-me         | Productivity  | Clarify plans and ideas through a focused, lightweight interview          |
-| social-media         | Productivity  | Cross-post to X, LinkedIn, Farcaster, Facebook, HN; find subreddits       |
+| social-media         | Productivity  | Cross-post, refresh link previews, and find relevant subreddits           |
 | todo-archive         | Productivity  | Archive checked TODO.md tasks into .ai/todos                              |
 | autoresearch         | Research      | Autonomous experiment loop                                                |
 | chromium-browser     | Research      | Shared Chromium browsing, DevTools automation, and Wayback research       |
