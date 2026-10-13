@@ -22,7 +22,11 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
     cargo fmt --all -- --check
 
 # Run the Rust validation gate.
-@rust-check: fmt-check lint test build
+@rust-check: fmt-check lint test build install-cli-test
+
+# Test platform-specific installation without installing binaries.
+@install-cli-test:
+    bash tests/install-cli.sh
 
 # Run the coordination dashboard validation gate.
 @coord-dashboard-check:
@@ -62,14 +66,20 @@ reset-coord-ledger:
     rm -f -- "${files[@]}"
     echo "Deleted the ai-coord ledger."
 
-cli_packages := "commit coord handoff notify skillet"
-
-# Install all local CLI packages under ~/.local.
+# Install the local CLI packages supported on macOS or Linux under ~/.local.
+[script("bash")]
 @install-cli:
-    for pkg in {{cli_packages}}; do \
-        cargo install --quiet --path "$pkg" --locked --force --root "$HOME/.local"; \
+    set -euo pipefail
+    os="$(uname -s)"
+    case "$os" in
+        Darwin) packages=(commit coord handoff notify skillet) ;;
+        Linux) packages=(commit coord handoff skillet) ;;
+        *) printf 'Unsupported operating system: %s (expected macOS or Linux)\n' "$os" >&2; exit 1 ;;
+    esac
+    for pkg in "${packages[@]}"; do
+        cargo install --quiet --path "$pkg" --locked --force --root "$HOME/.local"
     done
     # A running `ai-coord serve` keeps the old binary and rejects newer ledger schemas.
-    if launchctl print "gui/$(id -u)/local.ai-coord-api" >/dev/null 2>&1; then \
-        launchctl kickstart -k "gui/$(id -u)/local.ai-coord-api"; \
+    if [[ "$os" == Darwin ]] && launchctl print "gui/$(id -u)/local.ai-coord-api" >/dev/null 2>&1; then
+        launchctl kickstart -k "gui/$(id -u)/local.ai-coord-api"
     fi

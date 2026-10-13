@@ -13,13 +13,20 @@ PRB's collection of AI agent skills and the CLIs they rely on. Designed to work 
 bunx skills add PaulRBerg/agent-skills
 ```
 
-Install the CLIs the skills rely on:
+Install the CLIs on macOS or Linux with Rust nightly:
 
 ```sh
-cargo install --locked --git https://github.com/PaulRBerg/agent-skills ai-commit ai-coord ai-handoff ai-notify ai-skillet
+cargo +nightly install --locked --git https://github.com/PaulRBerg/agent-skills ai-commit ai-coord ai-handoff ai-skillet
 ```
 
-From a clone, `just toolkit::install-cli` installs them into `~/.local/bin`.
+On macOS, also install desktop notifications:
+
+```sh
+cargo +nightly install --locked --git https://github.com/PaulRBerg/agent-skills ai-notify
+```
+
+From a clone, `just toolkit::install-cli` installs the supported CLIs into `~/.local/bin`. See
+[toolkit installation](toolkit/README.md#installation) for prerequisites and Linux clipboard setup.
 
 ## Skills
 
