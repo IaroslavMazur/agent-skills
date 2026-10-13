@@ -102,6 +102,10 @@ export function App() {
                   <PanelsTopLeft aria-hidden="true" className="hidden size-4 sm:block" />
                   Coordination
                 </Tabs.Tab>
+                <Tabs.Tab className={navigationTab()} ref={messagesTabRef} value="messages">
+                  <MessageSquareText aria-hidden="true" className="hidden size-4 sm:block" />
+                  Messages
+                </Tabs.Tab>
                 <Tabs.Tab className={navigationTab()} value="findings">
                   <ClipboardCheck aria-hidden="true" className="hidden size-4 sm:block" />
                   Findings
@@ -112,10 +116,6 @@ export function App() {
                   >
                     {unresolvedCount}
                   </span>
-                </Tabs.Tab>
-                <Tabs.Tab className={navigationTab()} ref={messagesTabRef} value="messages">
-                  <MessageSquareText aria-hidden="true" className="hidden size-4 sm:block" />
-                  Messages
                 </Tabs.Tab>
                 <Tabs.Tab className={navigationTab()} value="handoffs">
                   <FileText aria-hidden="true" className="hidden size-4 sm:block" />
