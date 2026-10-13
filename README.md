@@ -25,7 +25,7 @@ From a clone, `just toolkit::install-cli` installs them into `~/.local/bin`.
 
 | Skill                | Category      | Description                                                               |
 | -------------------- | ------------- | ------------------------------------------------------------------------- |
-| agents-brain         | Agent tooling | Maintain repo context and repo-local skills                               |
+| agents-brain         | Agent tooling | Maintain repo context and create or maintain repo-local skills            |
 | agents-docs          | Agent tooling | Fetch current official Codex and Claude Code docs, including hooks/trust  |
 | agents-introspection | Agent tooling | Assess recurrence risk from Codex/Claude Code transcript history          |
 | agents-system        | Agent tooling | Redesign repo systems for agent understanding, control, and learning      |
@@ -34,7 +34,6 @@ From a clone, `just toolkit::install-cli` installs them into `~/.local/bin`.
 | repo-fanout          | Agent tooling | Run one task or skill across many repositories with per-repo agents       |
 | retro                | Agent tooling | Session retrospectives with transcript-backed environment fixes           |
 | skill-harmonization  | Agent tooling | Harmonize repository and user-installed skill portfolios                  |
-| skill-writing        | Agent tooling | Bootstrap a project-local agent skill                                     |
 | task-handoff         | Agent tooling | Create one single- or cross-repository Codex task handoff plan            |
 | wrap-up              | Agent tooling | Wind down a session fast: collect subagent wrap-ups and hand off the rest |
 | cli-cast             | Crypto        | Foundry cast CLI guidance                                                 |

@@ -138,11 +138,12 @@ the instructions change how a helper is used. Markdown changes always follow the
 ## Rules
 
 - Before writing or changing agent-facing prose, read
-  [the STE authoring profile](skills/skill-writing/references/asd-ste100.md) completely. Apply the profile during
+  [the STE authoring profile](skills/agents-brain/references/asd-ste100.md) completely. Apply the profile during
   writing. Complete its meaning and style review before finishing. Preserve obligation strength and protected technical
   content. This review does not establish official ASD dictionary compliance.
 - In this repository, an unqualified request to create, scaffold, or initialize a skill means an installable catalog
-  skill under `skills/<name>/`. Never route it to `.agents/skills/` or the `skill-writing` workflow.
+  skill under `skills/<name>/`. Follow `@skill-lifecycle` and `@skill-authoring`. Do not use the project-local
+  scaffolding in `agents-brain create-skill` here.
 - Create a repo-private internal skill under `.agents/internal-skills/<name>.md` only when the user explicitly requests
   an internal skill.
 - Edit or remove installable catalog skills under `skills/` here, regardless of the session's starting repository.

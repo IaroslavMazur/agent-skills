@@ -4,7 +4,7 @@
 setup() {
   # shellcheck disable=SC2154
   repo_root=$(cd "$BATS_TEST_DIRNAME/../.." && pwd -P)
-  helper=$repo_root/skills/skill-writing/scripts/fetch-agentskills-spec.sh
+  helper=$repo_root/skills/agents-brain/scripts/fetch-agentskills-spec.sh
   test_root=$(mktemp -d "${TMPDIR:-/tmp}/agentskills-cache-tests.XXXXXX")
   cache_dir=$test_root/cache
   fake_bin=$test_root/bin
