@@ -41,6 +41,7 @@ From a clone, `just toolkit::install-cli` installs them into `~/.local/bin`.
 | evm-atlas            | Crypto        | EVM lookup + DEX transaction/order interpretation                         |
 | pdf                  | Documents     | Exact local PDF reading and manipulation on macOS                         |
 | spreadsheets         | Documents     | Opinionated CSV/TSV/XLSX wrangling on macOS                               |
+| writing-editor       | Documents     | Surgical grammar and phrasing edits that keep writing natural and casual  |
 | cli-just             | Engineering   | Just command runner guidance                                              |
 | code-polish          | Engineering   | Simplify and/or risk-profiled review with autofix                         |
 | codebase-design      | Engineering   | Deep-module vocabulary and agent-legible codebase design                  |
