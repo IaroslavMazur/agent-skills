@@ -673,7 +673,7 @@ fn create_rolls_back_on_clipboard_mismatch_and_no_clipboard_needs_no_tools() {
     let repository = harness.repo("repo", true);
     let draft = harness.root.join("draft.md");
     fs::write(&draft, "# Clipboard\n").unwrap();
-    common::write_executable(&harness.root.join("shim/pbpaste"), "#!/bin/sh\nprintf wrong\n");
+    common::write_executable(&harness.clipboard_reader(), "#!/bin/sh\nprintf wrong\n");
     let output = harness.command([
         "create",
         "--repo",
@@ -726,7 +726,7 @@ fn create_rollback_preserves_preexisting_handoff_directories() {
     fs::create_dir_all(&handoffs).unwrap();
     fs::write(&marker, "keep\n").unwrap();
     fs::write(&draft, "# Clipboard\n").unwrap();
-    common::write_executable(&harness.root.join("shim/pbpaste"), "#!/bin/sh\nprintf wrong\n");
+    common::write_executable(&harness.clipboard_reader(), "#!/bin/sh\nprintf wrong\n");
 
     let output = harness.command([
         "create",

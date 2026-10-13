@@ -31,10 +31,22 @@ impl Harness {
         let clipboard = root.join("clipboard");
         fs::create_dir_all(&desktop).unwrap();
         fs::create_dir_all(&shim).unwrap();
-        write_executable(&shim.join("pbcopy"), "#!/bin/sh\ncat > \"$HANDOFF_CLIPBOARD\"\n");
-        write_executable(&shim.join("pbpaste"), "#!/bin/sh\ncat \"$HANDOFF_CLIPBOARD\"\n");
-        let inherited = std::env::var("PATH").unwrap_or_default();
-        let search_path = format!("{}:{inherited}", shim.display());
+        write_executable(&shim.join("pbcopy"), "#!/bin/sh\n/bin/cat > \"$HANDOFF_CLIPBOARD\"\n");
+        write_executable(&shim.join("pbpaste"), "#!/bin/sh\n/bin/cat \"$HANDOFF_CLIPBOARD\"\n");
+        write_executable(
+            &shim.join("wl-copy"),
+            "#!/bin/sh\n[ \"$*\" = '--type text/plain' ] || exit 2\n/bin/cat > \"$HANDOFF_CLIPBOARD\"\n",
+        );
+        write_executable(
+            &shim.join("wl-paste"),
+            "#!/bin/sh\n[ \"$*\" = '--no-newline --type text/plain' ] || exit 2\n/bin/cat \"$HANDOFF_CLIPBOARD\"\n",
+        );
+        write_executable(
+            &shim.join("xclip"),
+            "#!/bin/sh\ncase \"$*\" in\n'-selection clipboard -in') /bin/cat > \"$HANDOFF_CLIPBOARD\";;\n'-selection clipboard -out') /bin/cat \"$HANDOFF_CLIPBOARD\";;\n*) exit 2;;\nesac\n",
+        );
+        std::os::unix::fs::symlink(git_executable(), shim.join("git")).unwrap();
+        let search_path = shim.display().to_string();
         Self { _temporary: temporary, root, home, desktop, clipboard, shim, search_path }
     }
 
@@ -62,7 +74,23 @@ impl Harness {
         I: IntoIterator<Item = S>,
         S: AsRef<OsStr>,
     {
-        self.command_with_path(arguments, &self.search_path)
+        self.command_with_path(arguments, &self.search_path, &[])
+    }
+
+    pub fn command_with_env<I, S>(&self, arguments: I, environment: &[(&str, &str)]) -> Output
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<OsStr>,
+    {
+        self.command_with_path(arguments, &self.search_path, environment)
+    }
+
+    pub fn clipboard_reader(&self) -> PathBuf {
+        self.shim.join(if cfg!(target_os = "linux") { "wl-paste" } else { "pbpaste" })
+    }
+
+    pub fn clipboard_writer(&self) -> PathBuf {
+        self.shim.join(if cfg!(target_os = "linux") { "wl-copy" } else { "pbcopy" })
     }
 
     pub fn command_without_clipboard<I, S>(&self, arguments: I) -> Output
@@ -72,16 +100,13 @@ impl Harness {
     {
         let bin = self.root.join("without-clipboard");
         fs::create_dir_all(&bin).unwrap();
-        let git = env::split_paths(&env::var_os("PATH").unwrap_or_default())
-            .map(|directory| directory.join("git"))
-            .find(|candidate| candidate.is_file())
-            .expect("git is available on PATH");
+        let git = git_executable();
         #[cfg(unix)]
         std::os::unix::fs::symlink(git, bin.join("git")).unwrap();
-        self.command_with_path(arguments, &bin.display().to_string())
+        self.command_with_path(arguments, &bin.display().to_string(), &[])
     }
 
-    fn command_with_path<I, S>(&self, arguments: I, search_path: &str) -> Output
+    fn command_with_path<I, S>(&self, arguments: I, search_path: &str, environment: &[(&str, &str)]) -> Output
     where
         I: IntoIterator<Item = S>,
         S: AsRef<OsStr>,
@@ -99,6 +124,9 @@ impl Harness {
             .env_remove("GIT_WORK_TREE")
             .env_remove("GIT_INDEX_FILE")
             .env("PATH", search_path)
+            .env("WAYLAND_DISPLAY", "ai-handoff-test")
+            .env("DISPLAY", "")
+            .envs(environment.iter().copied())
             .args(arguments);
         command.output().unwrap()
     }
@@ -119,4 +147,11 @@ pub fn stdout(output: &Output) -> String {
 
 pub fn stderr(output: &Output) -> String {
     String::from_utf8_lossy(&output.stderr).into_owned()
+}
+
+fn git_executable() -> PathBuf {
+    env::split_paths(&env::var_os("PATH").unwrap_or_default())
+        .map(|directory| directory.join("git"))
+        .find(|candidate| candidate.is_file())
+        .expect("git is available on PATH")
 }

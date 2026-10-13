@@ -6,7 +6,6 @@ use std::{
     io::{Read, Write},
     os::fd::OwnedFd,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
     sync::atomic::{AtomicU64, Ordering},
 };
 
@@ -18,6 +17,7 @@ use rustix::{
 
 use crate::{
     cli::CreateArgs,
+    clipboard,
     error::{Error, Result},
     git,
     util::{home, shell_quote},
@@ -72,7 +72,7 @@ pub(crate) fn run(arguments: CreateArgs) -> Result<()> {
 
     let mut publication = publish(&placement.base, &placement.target, &contents)?;
     if !arguments.no_clipboard {
-        copy_and_verify(&command)?;
+        clipboard::copy_and_verify(&command)?;
     }
 
     println!("handoff\t{target_text}");
@@ -562,38 +562,6 @@ fn create_staged_file(directory: &OwnedFd) -> Result<(OsString, File)> {
         }
     }
     Err(Error::operational("cannot stage handoff: too many temporary filename collisions"))
-}
-
-fn copy_and_verify(command: &str) -> Result<()> {
-    let mut child =
-        Command::new("pbcopy")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::null())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|error| Error::operational(format!("required executable pbcopy is unavailable: {error}")))?;
-    child
-        .stdin
-        .take()
-        .expect("piped clipboard stdin")
-        .write_all(command.as_bytes())
-        .map_err(|error| Error::operational(format!("clipboard copy failed: {error}")))?;
-    let copied =
-        child.wait_with_output().map_err(|error| Error::operational(format!("clipboard copy failed: {error}")))?;
-    if !copied.status.success() {
-        return Err(Error::operational("clipboard copy failed"));
-    }
-
-    let pasted = Command::new("pbpaste")
-        .output()
-        .map_err(|error| Error::operational(format!("required executable pbpaste is unavailable: {error}")))?;
-    if !pasted.status.success() {
-        return Err(Error::operational("clipboard readback failed"));
-    }
-    if pasted.stdout != command.as_bytes() {
-        return Err(Error::operational("clipboard verification failed"));
-    }
-    Ok(())
 }
 
 fn utf8_path<'a>(path: &'a Path, label: &str) -> Result<&'a str> {

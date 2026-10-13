@@ -1,6 +1,7 @@
 #![deny(unsafe_code)]
 
 mod archive;
+mod clipboard;
 mod create;
 mod error;
 mod git;
