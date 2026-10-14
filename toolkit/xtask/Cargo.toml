@@ -1,0 +1,18 @@
+[package]
+authors.workspace = true
+description = "Release tooling for the toolkit CLIs"
+edition.workspace = true
+license.workspace = true
+name = "xtask"
+publish = false
+
+[dependencies]
+clap.workspace = true
+regex.workspace = true
+semver.workspace = true
+tempfile.workspace = true
+toml_edit.workspace = true
+
+[dev-dependencies]
+assert_cmd.workspace = true
+predicates.workspace = true

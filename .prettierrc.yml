@@ -6,3 +6,6 @@ overrides:
   - files: "*.md"
     options:
       proseWrap: always
+  - files: "toolkit/*/CHANGELOG.md"
+    options:
+      proseWrap: preserve

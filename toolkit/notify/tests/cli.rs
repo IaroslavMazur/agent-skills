@@ -88,7 +88,10 @@ impl TestEnv {
 #[test]
 fn version_and_usage_exit_codes_are_stable() {
     let environment = TestEnv::new();
-    environment.run(&["--version"], "").success().stdout(predicate::str::contains("ai-notify 1.0.0"));
+    environment
+        .run(&["--version"], "")
+        .success()
+        .stdout(predicate::str::contains(concat!("ai-notify ", env!("CARGO_PKG_VERSION"))));
 
     environment.run(&["codex"], "").code(2).stderr(predicate::str::contains("Missing JSON payload"));
 

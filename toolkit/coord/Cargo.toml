@@ -6,7 +6,7 @@ license.workspace = true
 name = "ai-coord"
 readme = "AGENTS.md"
 repository.workspace = true
-version.workspace = true
+version = "1.0.0"
 
 [dependencies]
 async-stream = "0.3"
@@ -16,7 +16,7 @@ hex = "0.4"
 jiff = "0.2"
 rand.workspace = true
 rusqlite.workspace = true
-semver = "1.0"
+semver.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

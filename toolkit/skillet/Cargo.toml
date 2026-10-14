@@ -1,6 +1,6 @@
 [package]
 name = "ai-skillet"
-version.workspace = true
+version = "1.0.0"
 authors.workspace = true
 edition.workspace = true
 description = "Inspect and maintain agent-skill catalogs"
@@ -14,7 +14,7 @@ categories = ["command-line-utilities", "development-tools"]
 clap.workspace = true
 ignore = "0.4"
 pulldown-cmark = "0.13"
-regex = "1"
+regex.workspace = true
 serde.workspace = true
 serde-saphyr = "1"
 serde_json.workspace = true

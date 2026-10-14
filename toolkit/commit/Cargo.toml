@@ -6,7 +6,7 @@ license.workspace = true
 name = "ai-commit"
 readme = "AGENTS.md"
 repository.workspace = true
-version.workspace = true
+version = "1.0.0"
 
 [dependencies]
 clap.workspace = true

@@ -22,7 +22,19 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
     cargo fmt --all -- --check
 
 # Run the Rust validation gate.
-@rust-check: fmt-check lint test build install-cli-test
+@rust-check: fmt-check lint test build install-cli-test changelog-check
+
+# Validate every CLI changelog against its manifest version.
+@changelog-check:
+    cargo run --quiet --locked --package xtask -- check
+
+# Sync a CLI's manifest and Cargo.lock to its newest changelog entry.
+@release-prepare crate:
+    cargo run --quiet --locked --package xtask -- prepare {{crate}}
+
+# Tag a pushed release commit and create its GitHub release.
+@release-publish crate:
+    cargo run --quiet --locked --package xtask -- publish {{crate}}
 
 # Test platform-specific installation without installing binaries.
 @install-cli-test:

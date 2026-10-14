@@ -63,3 +63,17 @@ For clipboard copying, install [wl-clipboard](https://github.com/bugaevc/wl-clip
 verify a handoff prompt. In a headless environment, use `ai-handoff create --no-clipboard`.
 
 Cross-repository handoffs require an existing `$HOME/Desktop` directory, including on Linux.
+
+## Versions
+
+Each CLI follows [SemVer](https://semver.org/) independently and records its releases in its `CHANGELOG.md`, in
+[Common Changelog](https://common-changelog.org/) format: [ai-commit](commit/CHANGELOG.md),
+[ai-coord](coord/CHANGELOG.md), [ai-handoff](handoff/CHANGELOG.md), [ai-notify](notify/CHANGELOG.md), and
+[ai-skillet](skillet/CHANGELOG.md).
+
+Tags use the format `<crate>-v<version>`, for example `ai-coord-v1.0.0`. Each tag has a
+[GitHub release](https://github.com/PaulRBerg/agent-skills/releases). To install a release:
+
+```sh
+cargo +nightly install --locked --git https://github.com/PaulRBerg/agent-skills --tag ai-coord-v1.0.0 ai-coord
+```
