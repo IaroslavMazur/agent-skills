@@ -85,6 +85,7 @@ rewrites.
 | Skill           | Source                                                                                                                                                 |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | codebase-design | [mattpocock/skills: codebase-design](https://github.com/mattpocock/skills/tree/main/skills/engineering/codebase-design)                                |
+| grill-me        | [mattpocock/skills: grilling](https://github.com/mattpocock/skills/tree/main/skills/productivity/grilling)                                             |
 | html-playground | [anthropics/claude-plugins-official: playground](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/playground/skills/playground) |
 | retro           | [mattpocock/skills: retro](https://github.com/mattpocock/skills/tree/main/skills/engineering/retro)                                                    |
 
