@@ -147,7 +147,10 @@ the instructions change how a helper is used. Markdown changes always follow the
 - Create a repo-private internal skill under `.agents/internal-skills/<name>.md` only when the user explicitly requests
   an internal skill.
 - Run [`@rebase-skill`](.agents/internal-skills/rebase-skill.md) only when the user explicitly requests an upstream
-  rebase of a selected skill. Never invoke it autonomously or through routine maintenance.
+  rebase of a selected skill, or for Circadian's weekly scheduled rebase. Never invoke it autonomously or through other
+  routine maintenance.
+- List every skill forked from an external source in the README's "Forked Skills" table with its upstream skill URL. The
+  weekly scheduled rebase reads that table.
 - Edit or remove installable catalog skills under `skills/` here, regardless of the session's starting repository.
   Installed copies belong to the publish workflow.
 - Changes here are not live until installed into every target declared by the skill. By default, `publish-skills`

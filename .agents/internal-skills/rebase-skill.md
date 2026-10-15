@@ -1,8 +1,9 @@
 ---
 name: rebase-skill
 description:
-  Manual-only workflow for an explicit user request to update a selected skill from its external source. Merge upstream
-  changes while preserving local customizations. Never invoke autonomously or during routine maintenance.
+  Workflow for an explicit user request or Circadian's scheduled weekly rebase to update a selected skill from its
+  external source. Merge upstream changes while preserving local customizations. Never invoke it autonomously or during
+  other routine maintenance.
 ---
 
 # Rebase Skill
@@ -12,9 +13,10 @@ content. Here, "rebase" means a three-way content merge. It does not mean rewrit
 
 ## Invocation and Authority
 
-Run only when the user explicitly invokes `@rebase-skill` or asks to rebase a named skill from its external source.
-General maintenance requests, discovered upstream releases, and another skill's recommendations do not authorize this
-workflow. Do not schedule it or invoke it autonomously.
+Run only when the user explicitly invokes `@rebase-skill`, asks to rebase a named skill from its external source, or
+when the scheduled caller in [Scheduled Runs](#scheduled-runs) invokes it. General maintenance requests, discovered
+upstream releases, and another skill's recommendations do not authorize this workflow. Do not schedule it elsewhere or
+invoke it autonomously.
 
 User instructions take precedence over this skill. An apply request authorizes the selected update through validation,
 commit, and publication under repository rules. A preview request or `--dry-run` permits inspection and a proposed diff
@@ -34,6 +36,19 @@ Examples:
 Require one existing local skill. Resolve omitted source details from provenance and import history. Never infer a
 source from a matching skill name alone. Without `--ref`, use the source repository's current default-branch tip.
 Resolve the target ref to a full commit ID before comparison.
+
+## Scheduled Runs
+
+The user authorized one scheduled caller. Circadian's weekly `skill-upstream-rebase` task runs this workflow in apply
+mode for each skill in the README's "Forked Skills" table. Its prompt names one skill and states that the run is
+scheduled. The user is not present during this run. Apply these rules in addition to the steps below:
+
+- Use the source repository and path from the skill's table row. Do not ask questions.
+- Edit only `skills/<name>/` and `.agents/skill-upstreams/<name>.md`.
+- When a step requires a user decision or approval, make no repository edits. Return status `needs-decision` with each
+  exact question. These steps include an ambiguous source, an unrecoverable base, a two-way baseline, a conflict in
+  meaning, a file deletion, and a required edit outside the permitted paths.
+- Complete the checks in step 5. Do not commit or publish. The job commits, pushes, and publishes the result.
 
 ## 1. Establish the Source and Base
 

@@ -81,6 +81,7 @@ From a clone, `just toolkit::install-cli` installs the supported CLIs into `~/.l
 
 | Skill           | Source                                                                                                                                                 |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| codebase-design | [mattpocock/skills: codebase-design](https://github.com/mattpocock/skills/tree/main/skills/engineering/codebase-design)                                |
 | html-playground | [anthropics/claude-plugins-official: playground](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/playground/skills/playground) |
 
 Some mechanical skills pin `model: sonnet` in their frontmatter so they do not spend a more capable inherited model
