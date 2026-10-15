@@ -1,19 +1,17 @@
 # Skill Provenance
 
 Known external origins researched on 2026-10-15. These records distinguish whole-skill forks from borrowed components,
-inferred sources, inspiration, and replacements. They are repository-only evidence, not installed skill content.
+inferred sources, inspiration, and replacements. They are repository-only evidence, not installed skill content. Keep
+only active skill records on `main`. Move each shelved skill's record and index entry to the `shelved` branch.
 
-| Skill                                 | Relationship                                       | Update boundary                  |
-| ------------------------------------- | -------------------------------------------------- | -------------------------------- |
-| [codebase-design](codebase-design.md) | Confirmed fork and adaptation                      | Mapped skill files               |
-| [html-playground](html-playground.md) | Confirmed fork and adaptation                      | Mapped skill files               |
-| [retro](retro.md)                     | Confirmed adaptation                               | Mapped skill entrypoint          |
-| [grill-me](grill-me.md)               | External-derived, published source match inferred  | Recover original source and base |
-| [autoresearch](autoresearch.md)       | Port of an external project, repository unresolved | Confirm source before comparison |
-| [agents-brain](agents-brain.md)       | Two component adaptations                          | Mapped references only           |
-| [frontend-design](frontend-design.md) | Inspiration followed by independent rewrite        | No mechanical merge base         |
-| [pdf](pdf.md)                         | Replacement of an external skill                   | No mechanical merge base         |
-| [diagnosing-bugs](diagnosing-bugs.md) | Historical fork, now shelved                       | Do not restore or schedule       |
+| Skill                                 | Relationship                                | Update boundary                  |
+| ------------------------------------- | ------------------------------------------- | -------------------------------- |
+| [codebase-design](codebase-design.md) | Confirmed fork and adaptation               | Mapped skill files               |
+| [html-playground](html-playground.md) | Confirmed fork and adaptation               | Mapped skill files               |
+| [retro](retro.md)                     | Confirmed adaptation                        | Mapped skill entrypoint          |
+| [grill-me](grill-me.md)               | Confirmed adaptation                        | Recover historical upstream base |
+| [agents-brain](agents-brain.md)       | Two component adaptations                   | Mapped references only           |
+| [frontend-design](frontend-design.md) | Inspiration followed by independent rewrite | No mechanical merge base         |
 
 The README's [Forked Skills table](../../README.md#forked-skills) is the scheduled rebase input. This index does not add
 scheduled targets. Follow [rebase-skill](../internal-skills/rebase-skill.md) only under its invocation policy.

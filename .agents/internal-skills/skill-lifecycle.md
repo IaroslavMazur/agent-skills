@@ -41,14 +41,18 @@ Use these checklists to create, rename, delete, or shelve skills owned by this r
 
 ## Shelve (Catalog)
 
-The `shelved` branch is a skills-only catalog. It contains `skills/<name>/` plus a `README.md` table row per skill. Work
-on it in a temporary `git worktree`. Never switch the shared checkout.
+The `shelved` branch contains archived skills, a `README.md` table, and known provenance under
+`.agents/skill-upstreams/`. Work on it in a temporary `git worktree`. Never switch the shared checkout.
 
 1. Copy the committed skill verbatim into the worktree's `skills/<name>/`. Rename it only when asked. If renaming it,
    update `name:`.
-2. Add the `README.md` table row.
-3. Commit and push `shelved`. Do not run Prettier, `just skill-check`, or other checks on shelved skills. They are
-   archived as-is.
+2. Add the `README.md` table row. If the skill has a provenance record, copy it into `.agents/skill-upstreams/` on
+   `shelved`. Update that branch's provenance index and mark the record as shelved.
+3. Commit and push `shelved` before removing the active copy. Preserve archived skill files verbatim. Do not run
+   Prettier, `just skill-check`, or other checks on those skill files. Format only changed archive documentation.
+4. On `main`, apply the source cleanup from Delete (Catalog). Remove the skill's owned tests, provenance record, and
+   index entry. Keep shelved skill provenance only on `shelved`, not in `.agents/skill-upstreams/` on `main`.
+5. Run `just skill-check` on `main`. Commit and publish the removal through `@publish-skills`.
 
 ## Internal Skills (Create / Rename / Delete)
 
