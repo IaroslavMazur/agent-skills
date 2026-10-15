@@ -146,6 +146,8 @@ the instructions change how a helper is used. Markdown changes always follow the
   scaffolding in `agents-brain create-skill` here.
 - Create a repo-private internal skill under `.agents/internal-skills/<name>.md` only when the user explicitly requests
   an internal skill.
+- Run [`@rebase-skill`](.agents/internal-skills/rebase-skill.md) only when the user explicitly requests an upstream
+  rebase of a selected skill. Never invoke it autonomously or through routine maintenance.
 - Edit or remove installable catalog skills under `skills/` here, regardless of the session's starting repository.
   Installed copies belong to the publish workflow.
 - Changes here are not live until installed into every target declared by the skill. By default, `publish-skills`
