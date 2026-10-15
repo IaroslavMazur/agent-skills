@@ -15,6 +15,7 @@ npx skills add PaulRBerg/agent-skills#shelved
 
 | Skill              | Description                                   |
 | ------------------ | --------------------------------------------- |
+| autoresearch       | Autonomous experiment loop                    |
 | diagnosing-bugs    | Loop-first bug diagnosis and regression tests |
 | diagram-monochrome | Monochrome technical schematic diagrams       |
 | effect-ts-v3       | Effect 3 patterns and source-aligned guidance |
@@ -23,6 +24,10 @@ npx skills add PaulRBerg/agent-skills#shelved
 | oracle-codex       | Codex oracle for planning                     |
 | vitest             | Vitest v4 testing guidance                    |
 | work               | End-to-end task implementation                |
+
+## Provenance
+
+See [external skill origins](.agents/skill-upstreams/README.md) for known sources and local adaptations.
 
 ## References
 
