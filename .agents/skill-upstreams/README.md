@@ -13,8 +13,16 @@ only active skill records on `main`. Move each shelved skill's record and index 
 | [agents-brain](agents-brain.md)       | Two component adaptations                   | Mapped references only           |
 | [frontend-design](frontend-design.md) | Inspiration followed by independent rewrite | No mechanical merge base         |
 
-The README's [Forked Skills table](../../README.md#forked-skills) is the scheduled rebase input. This index does not add
-scheduled targets. Follow [rebase-skill](../internal-skills/rebase-skill.md) only under its invocation policy.
+Circadian's weekly job discovers the union of the README's [Forked Skills table](../../README.md#forked-skills) and
+active `.agents/skill-upstreams/<name>.md` records from fresh `origin/main`. It excludes this index and deduplicates
+skill names. Every record above is therefore enrolled, including component adaptations and inspiration. Each record's
+update boundary still controls the review or merge. Follow [rebase-skill](../internal-skills/rebase-skill.md) only under
+its invocation policy.
+
+When importing or forking a whole external skill, add its table row, provenance record, and index entry in the same
+change. Track components and inspiration here without adding them as whole-skill forks. Follow
+[skill-lifecycle](../internal-skills/skill-lifecycle.md#external-provenance) to record the required evidence and verify
+discovery. No per-skill scheduler list needs an update.
 
 Local import commits establish catalog history. They are not upstream merge bases. Recover an unknown historical base or
 obtain explicit approval for a two-way reconciliation before a content merge. No rebase occurred during this research.

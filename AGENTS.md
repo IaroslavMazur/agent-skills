@@ -149,8 +149,14 @@ the instructions change how a helper is used. Markdown changes always follow the
 - Run [`@rebase-skill`](.agents/internal-skills/rebase-skill.md) only when the user explicitly requests an upstream
   rebase of a selected skill, or for Circadian's weekly scheduled rebase. Never invoke it autonomously or through other
   routine maintenance.
-- List every skill forked from an external source in the README's "Forked Skills" table with its upstream skill URL. The
-  weekly scheduled rebase reads that table.
+- When importing or forking a whole external skill, add its upstream URL to the README's "Forked Skills" table. In the
+  same change, create `.agents/skill-upstreams/<name>.md` and add its provenance index entry. Follow
+  [`@skill-lifecycle`](.agents/internal-skills/skill-lifecycle.md#external-provenance) for required evidence and
+  enrollment checks. Track borrowed components and inspiration in provenance without labeling them as whole-skill forks.
+- Circadian's `~/projects/circadian/jobs/rebase-upstream-skills.sh` discovers the union of "Forked Skills" rows and
+  active per-skill provenance records from fresh `origin/main`. It excludes the provenance index and deduplicates skill
+  names. No per-skill scheduler list needs an update. Discovery preserves each record's merge limits and does not
+  authorize a new baseline.
 - Edit or remove installable catalog skills under `skills/` here, regardless of the session's starting repository.
   Installed copies belong to the publish workflow.
 - Changes here are not live until installed into every target declared by the skill. By default, `publish-skills`

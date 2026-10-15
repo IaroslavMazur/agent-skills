@@ -78,9 +78,10 @@ From a clone, `just toolkit::install-cli` installs the supported CLIs into `~/.l
 
 ## Forked Skills
 
-This table lists confirmed whole-skill sources used by the scheduled rebase job. See the
-[provenance index](.agents/skill-upstreams/README.md) for component adaptations, inferred origins, and independent
-rewrites.
+This table lists confirmed whole-skill sources. See the [provenance index](.agents/skill-upstreams/README.md) for
+component adaptations, inferred origins, and independent rewrites. Circadian's weekly job discovers both this table and
+active per-skill provenance records from fresh `origin/main`. Each record's update boundary controls its review or
+merge.
 
 | Skill           | Source                                                                                                                                                 |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
