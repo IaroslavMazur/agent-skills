@@ -200,6 +200,8 @@ the instructions change how a helper is used. Markdown changes always follow the
 - Resolve `references/`, `scripts/`, `examples/`, and `assets/` paths relative to the owning skill directory.
 - Bash scripts must be compatible with Bash v3.2 (`/bin/bash`) because macOS ships that system version and skills may
   run in Bash-based environments.
+- Run `just bats-test tests/shell-compat.bats` to check production helpers with system Bash syntax parsing. This does
+  not prove full Bash 3.2 compatibility.
 - Keep generated docs terse, imperative, and expert-to-expert.
 - Do not leak personal crypto (EVM) addresses in any skill. Use well-known public addresses or the standard Etherscan
   doc example (`0xde0B295669a9FD93d5F28D9Ec85E40f4cb697BAe`). Do not use a real user, maintainer, or personal wallet
