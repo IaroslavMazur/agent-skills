@@ -1,0 +1,36 @@
+# Skill Provenance
+
+Known external origins researched on 2026-10-15. These records distinguish whole-skill forks from borrowed components,
+inferred sources, inspiration, and replacements. They are repository-only evidence, not installed skill content.
+
+| Skill                                 | Relationship                                       | Update boundary                  |
+| ------------------------------------- | -------------------------------------------------- | -------------------------------- |
+| [codebase-design](codebase-design.md) | Confirmed fork and adaptation                      | Mapped skill files               |
+| [html-playground](html-playground.md) | Confirmed fork and adaptation                      | Mapped skill files               |
+| [retro](retro.md)                     | Confirmed adaptation                               | Mapped skill entrypoint          |
+| [grill-me](grill-me.md)               | External-derived, published source match inferred  | Recover original source and base |
+| [autoresearch](autoresearch.md)       | Port of an external project, repository unresolved | Confirm source before comparison |
+| [agents-brain](agents-brain.md)       | Two component adaptations                          | Mapped references only           |
+| [frontend-design](frontend-design.md) | Inspiration followed by independent rewrite        | No mechanical merge base         |
+| [pdf](pdf.md)                         | Replacement of an external skill                   | No mechanical merge base         |
+| [diagnosing-bugs](diagnosing-bugs.md) | Historical fork, now shelved                       | Do not restore or schedule       |
+
+The README's [Forked Skills table](../../README.md#forked-skills) is the scheduled rebase input. This index does not add
+scheduled targets. Follow [rebase-skill](../internal-skills/rebase-skill.md) only under its invocation policy.
+
+Local import commits establish catalog history. They are not upstream merge bases. Recover an unknown historical base or
+obtain explicit approval for a two-way reconciliation before a content merge. No rebase occurred during this research.
+
+## Coverage and Limits
+
+Research covered all 44 active catalog skills, bounded Git addition and attribution history, and current-project
+unarchived session history. Targeted searches widened beyond the initial 60-day window. Five relevant session bodies
+were inspected. Archived sessions and original precursor-project bodies were not inspected. This records known origins,
+not proof that every unlisted skill is original. Normal tool/API documentation and generic prompting guides are not
+ancestry evidence.
+
+`brainstorm-with-me` descends from local interview skills rather than a separately established external source. See
+[the local branch](https://github.com/PaulRBerg/agent-skills/commit/e29d5ef117a2e5c483367204c328350b17b41c52),
+[interview work](https://github.com/PaulRBerg/agent-skills/commit/2e11504f2b616ae4413191957521c9f5506180cc), and
+[rename](https://github.com/PaulRBerg/agent-skills/commit/d93b9e71f36e7f43319479a69a40accb4d186b36). It is not an
+additional external rebase target.

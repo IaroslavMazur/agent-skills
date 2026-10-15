@@ -79,10 +79,15 @@ From a clone, `just toolkit::install-cli` installs the supported CLIs into `~/.l
 
 ## Forked Skills
 
+This table lists confirmed whole-skill sources used by the scheduled rebase job. See the
+[provenance index](.agents/skill-upstreams/README.md) for component adaptations, inferred origins, and independent
+rewrites.
+
 | Skill           | Source                                                                                                                                                 |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | codebase-design | [mattpocock/skills: codebase-design](https://github.com/mattpocock/skills/tree/main/skills/engineering/codebase-design)                                |
 | html-playground | [anthropics/claude-plugins-official: playground](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/playground/skills/playground) |
+| retro           | [mattpocock/skills: retro](https://github.com/mattpocock/skills/tree/main/skills/engineering/retro)                                                    |
 
 Some mechanical skills pin `model: sonnet` in their frontmatter so they do not spend a more capable inherited model
 where deterministic tooling already carries the workflow.
