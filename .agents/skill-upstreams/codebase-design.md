@@ -7,7 +7,13 @@
   [catalog addition](https://github.com/PaulRBerg/agent-skills/commit/b5ef809e34a398c7528794b4ec8d9e2f35e26b2f)
   explicitly records a fork and adaptation with catalog metadata and references. The local entrypoint retains
   attribution.
-- **Upstream revision:** unknown. The last reconciled upstream base is unknown.
+- **Reconciled upstream commit:** `49dd158d1076134a641b33efb035946536778336` (default-branch tip, no requested ref).
+- **Previous base:** `c0d69015e0cc8b66715beb3f93f9e53256e20f30`, recovered from upstream history, not from the import
+  commit itself.
+- **Base evidence:** the catalog addition is dated 2026-08-10. `c0d69015` (2026-08-06) is the last upstream commit to
+  the mapped files before that date. After word-level normalization, the imported files differ from `c0d69015` only by
+  local adaptations. They contain its harness-neutral "Spawn 3+ sub-agents in parallel." wording, absent from earlier
+  revisions. They lack the em-dash removal from `32165827` (2026-08-19).
 
 ## Mapping and Local Behavior
 
@@ -18,13 +24,31 @@ Map upstream paths to `skills/codebase-design/` as follows:
 | `SKILL.md`           | `SKILL.md`                      |
 | `DEEPENING.md`       | `references/DEEPENING.md`       |
 | `DESIGN-IT-TWICE.md` | `references/DESIGN-IT-TWICE.md` |
+| `agents/openai.yaml` | `agents/openai.yaml`            |
 
-`references/AGENT-LEGIBILITY.md` is a local addition. `agents/openai.yaml` is locally maintained catalog metadata.
+`references/AGENT-LEGIBILITY.md` is a local addition. `agents/openai.yaml` is locally maintained catalog metadata. Do
+not merge upstream metadata into it.
 
-Preserve local deep-module vocabulary, agent-legibility guidance, ownership and repository-context conventions,
-reference navigation, and output contract. Verify the current upstream layout before extending the mapping.
+Preserve these local customizations:
+
+- `SKILL.md`: catalog frontmatter description, prose rewritten under the STE profile, the Deep vs shallow definitions
+  that replace upstream diagrams, the Agent legibility section, the Output Contract, `references/` link paths, the
+  AGENT-LEGIBILITY entry in Going deeper, and the attribution line.
+- `references/DEEPENING.md`: `../SKILL.md` link, STE rewrites, the hedged in-process deepening rule, and the local
+  Finding deepening candidates section.
+- `references/DESIGN-IT-TWICE.md`: `../SKILL.md` links and the generic target-project domain vocabulary source
+  (`AGENTS.md`, glossary, or docs) instead of a named glossary file.
+
+## Upstream Change Dispositions
+
+Changes from `c0d69015` to `49dd158d`:
+
+- **Accepted, adapted:** em-dash removal (`32165827`). Applied to the local wording with colons, commas, periods, and
+  parentheses, never semicolons. Extended to local-only lines in mapped files for consistency.
+- **Intentionally excluded:** `CONTEXT.md` to `GLOSSARY.md` rename in `DESIGN-IT-TWICE.md` (`d80fa0f4`). The local
+  generic domain vocabulary source already covers it.
 
 ## Safe Update Boundary
 
-Recover the base or approve a two-way reconciliation before merging mapped files. Treat local-only references and
-locally maintained metadata as local behavior. Do not infer an upstream revision from the catalog import commit.
+Compare future upstream changes from `49dd158d` over the mapped files. Treat local-only references and locally
+maintained metadata as local behavior.
