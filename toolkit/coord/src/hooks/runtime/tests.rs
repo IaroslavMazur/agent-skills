@@ -1341,6 +1341,19 @@ fn waker_arms_on_successful_post_tool_use_only_for_queued_work() {
 }
 
 #[test]
+fn waker_outside_a_git_worktree_is_a_healthy_noop() {
+    let temp = TempDir::new().unwrap();
+    let (coordinator, _repo) = runtime(&temp);
+    let outside = temp.path().join("outside");
+    fs::create_dir(&outside).unwrap();
+    let payload = json!({"session_id":"waiter", "cwd":outside, "hook_event_name":"PostToolUseFailure"});
+    assert!(HookRuntime::new(&coordinator).waker("claude", &payload).is_none());
+    let health = coordinator.store().unwrap().hook_health().unwrap();
+    assert_eq!(health.len(), 1);
+    assert!(health[0].last_error_code.is_none());
+}
+
+#[test]
 fn session_end_cleans_identity_wide_bundle_work_and_deduplicates_wakeup() {
     let temp = TempDir::new().unwrap();
     let (coordinator, first) = runtime(&temp);

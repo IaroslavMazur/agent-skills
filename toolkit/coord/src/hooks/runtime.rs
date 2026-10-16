@@ -344,9 +344,13 @@ impl<'a> HookRuntime<'a> {
                 .ok_or_else(|| AppError::usage("missing session id"))?;
             let identity = Identity { client: Client::Claude, session_id: session_id.to_owned() };
             let cwd = hook_cwd(payload)?;
-            let root = git_root(&cwd).ok_or_else(|| AppError::operational("waker requires a Git worktree"))?;
-            let repo_root = path_text(&root)?;
             let mut store = self.coordinator.store()?;
+            // `ai-coord start` outside a Git worktree fails by design, leaving nothing to wait for.
+            let Some(root) = git_root(&cwd) else {
+                store.hook_success(Client::Claude, event, self.coordinator.now())?;
+                return Ok(None);
+            };
+            let repo_root = path_text(&root)?;
             let queued = store
                 .work(&identity)?
                 .is_some_and(|work| work.state == WorkState::Queued && work.claim(&repo_root).is_some());
