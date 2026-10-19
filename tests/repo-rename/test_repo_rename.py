@@ -174,6 +174,23 @@ class RepoRenameTests(unittest.TestCase):
         status = subprocess.run(["git", "status", "--porcelain"], cwd=self.repo, text=True, capture_output=True, check=True)
         self.assertEqual(status.stdout, "")
 
+    def test_default_preview_excludes_ignored_native_build_output(self) -> None:
+        ignored = self.repo / "apps" / "mobile" / "ios" / "Pods" / "config.txt"
+        ignored.parent.mkdir(parents=True)
+        ignored.write_text(str(self.repo.resolve()))
+        (self.repo / ".gitignore").write_text("apps/mobile/ios/\n")
+        subprocess.run(["git", "add", ".gitignore"], cwd=self.repo, check=True)
+        subprocess.run(["git", "commit", "-qm", "ignore native output"], cwd=self.repo, check=True)
+        destination = self.root / "work" / "old-repo"
+        result = self.run_script(str(self.repo), str(destination), "--dry-run")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["mutations"][-1]["files"], [])
+        result = self.run_script(str(self.repo), str(destination), "--dry-run", "--include-local-state")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["mutations"][-1]["files"], [
+            {"path": str(ignored.resolve()), "occurrences": 1},
+        ])
+
     def test_preview_and_apply_preserve_protected_and_external_files(self) -> None:
         notes = self.repo / ".ai"
         notes.mkdir()
