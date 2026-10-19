@@ -105,8 +105,8 @@ async function finish(api: any) {
   return { status: api.status(), records };
 }
 
-test("script stays a pasteable arrow-function expression", () => {
-  expect(source.trimStart().startsWith("() => {")).toBe(true);
+test("script stays a pasteable named-function expression", () => {
+  expect(source.trimStart().startsWith("function debankCollect() {")).toBe(true);
   expect(source.trimEnd().endsWith("}")).toBe(true);
 });
 
