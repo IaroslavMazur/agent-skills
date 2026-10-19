@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import re
@@ -9,10 +10,16 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "skills" / "repo-rename" / "scripts" / "repo-rename.py"
+SPEC = importlib.util.spec_from_file_location("repo_rename", SCRIPT)
+assert SPEC is not None and SPEC.loader is not None
+HELPER = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = HELPER
+SPEC.loader.exec_module(HELPER)
 
 
 class RepoRenameTests(unittest.TestCase):
@@ -83,6 +90,89 @@ class RepoRenameTests(unittest.TestCase):
         self.assertEqual(result.returncode, 64)
         self.assertIn("--confirm", result.stderr)
         self.assertFalse((Path(self.env["HOME"]) / "gh-writes").exists())
+
+    def test_same_name_move_previews_then_preserves_remote_and_updates_paths(self) -> None:
+        old_path = str(self.repo.resolve())
+        destination = self.root / "work" / "apps" / "old-repo"
+        new_path = str(destination.resolve())
+        readme = self.repo / "README.md"
+        readme.write_text(f"old-repo\n{old_path}/src\n", encoding="utf-8")
+        subprocess.run(["git", "commit", "-qam", "path fixture"], cwd=self.repo, check=True)
+        claude = Path(self.env["HOME"]) / ".claude" / "projects"
+        project = claude / re.sub(r"[^A-Za-z0-9]", "-", old_path)
+        project.mkdir(parents=True)
+        (project / "session.jsonl").write_text(json.dumps({"cwd": old_path}), encoding="utf-8")
+        result = self.run_script(old_path, str(destination), "--dry-run")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(result.stdout)
+        self.assertFalse(report["rename_github"])
+        self.assertEqual(report["old_repo"], report["new_repo"])
+        self.assertEqual(report["old_remote"], report["new_remote"])
+        self.assertEqual(report["confirmation_token"], f"move:{old_path}->{new_path}")
+        parents = [m["path"] for m in report["mutations"] if m["kind"] == "create-parent"]
+        self.assertEqual(parents, [str(destination.parent.parent.resolve()), str(destination.parent.resolve())])
+        self.assertFalse(destination.parent.parent.exists())
+        self.assertEqual(readme.read_text(), f"old-repo\n{old_path}/src\n")
+        self.assertTrue(project.exists())
+
+        result = self.run_script(old_path, str(destination), "--apply", "--confirm", report["confirmation_token"])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(self.repo.exists())
+        self.assertEqual((destination / "README.md").read_text(), f"old-repo\n{new_path}/src\n")
+        moved_project = claude / re.sub(r"[^A-Za-z0-9]", "-", new_path)
+        self.assertEqual(json.loads((moved_project / "session.jsonl").read_text())["cwd"], new_path)
+        remote = subprocess.run(["git", "remote", "get-url", "origin"], cwd=destination, text=True, capture_output=True, check=True)
+        self.assertEqual(remote.stdout.strip(), "git@github.com:owner/old-repo.git")
+        self.assertFalse((Path(self.env["HOME"]) / "gh-writes").exists())
+
+    def test_move_rejects_dirty_tree_and_wrong_confirmation(self) -> None:
+        destination = self.root / "work" / "old-repo"
+        result = self.run_script(str(self.repo), str(destination), "--apply", "--confirm", "wrong")
+        self.assertEqual(result.returncode, 64)
+        (self.repo / "untracked").write_text("keep")
+        result = self.run_script(str(self.repo), str(destination), "--dry-run")
+        self.assertEqual(result.returncode, 64)
+        self.assertIn("working tree is not clean", result.stderr)
+        self.assertFalse(destination.parent.exists())
+
+    def test_move_rejects_invalid_targets(self) -> None:
+        symlink = self.root / "work" / "old-repo"
+        symlink.parent.mkdir()
+        symlink.symlink_to(self.root / "missing")
+        for target in (self.repo, self.repo / "old-repo", self.root / "other-name", symlink):
+            with self.subTest(target=target):
+                result = self.run_script(str(self.repo), str(target), "--dry-run")
+                self.assertEqual(result.returncode, 64)
+                self.assertTrue(self.repo.exists())
+
+    def test_move_without_remotes_does_not_require_github(self) -> None:
+        subprocess.run(["git", "remote", "remove", "origin"], cwd=self.repo, check=True)
+        destination = self.root / "work" / "old-repo"
+        result = self.run_script(str(self.repo), str(destination), "--dry-run")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(result.stdout)
+        self.assertTrue(report["local_only"])
+        self.assertEqual(report["mutations"][-1]["files"], [])
+        result = self.run_script(str(self.repo), str(destination), "--apply", "--confirm", report["confirmation_token"])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((destination / "README.md").read_text(), "old-repo\n")
+
+    def test_move_failure_restores_source_and_removes_created_parents(self) -> None:
+        subprocess.run(["git", "remote", "remove", "origin"], cwd=self.repo, check=True)
+        destination = self.root / "work" / "apps" / "old-repo"
+        readme = self.repo / "README.md"
+        old_text = str(self.repo.resolve()) + "\n"
+        readme.write_text(old_text)
+        subprocess.run(["git", "commit", "-qam", "path fixture"], cwd=self.repo, check=True)
+        with patch.dict(os.environ, self.env, clear=True):
+            plan = HELPER.preflight(str(self.repo), str(destination))
+        with patch.object(HELPER.os, "replace", side_effect=OSError("injected write failure")):
+            with self.assertRaisesRegex(HELPER.RenameError, "rollback completed"):
+                HELPER.apply(plan)
+        self.assertEqual(readme.read_text(), old_text)
+        self.assertFalse(destination.parent.parent.exists())
+        status = subprocess.run(["git", "status", "--porcelain"], cwd=self.repo, text=True, capture_output=True, check=True)
+        self.assertEqual(status.stdout, "")
 
     def test_preview_and_apply_preserve_protected_and_external_files(self) -> None:
         notes = self.repo / ".ai"

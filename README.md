@@ -65,7 +65,7 @@ From a clone, `just toolkit::install-cli` installs the supported CLIs into `~/.l
 | cli-gh               | Git & GitHub  | GitHub CLI operations                                                     |
 | commit               | Git & GitHub  | Semantic commit messages and branch squashes via ai-commit                |
 | release-bumper       | Git & GitHub  | Release workflow with changelog, tagging                                  |
-| repo-rename          | Git & GitHub  | Rename GitHub repo, folder, and agent thread references                   |
+| repo-rename          | Git & GitHub  | Rename or relocate repos and preserve agent thread references             |
 | yeet                 | Git & GitHub  | GitHub contribution workflows                                             |
 | ai-prune             | Productivity  | Archive stale .ai files and trash stale .cache entries on macOS           |
 | brainstorm-with-me   | Productivity  | Co-create novel ideas and converge on a testable concept                  |
