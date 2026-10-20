@@ -48,6 +48,8 @@ fn baseline_exclusion_commits_only_baseline_to_worktree_delta() {
 fn baseline_exclusion_handles_nearby_unrelated_edits() {
     for automatic in [false, true] {
         let harness = Harness::new("baseline-nearby");
+        harness.write(".git/info/attributes", "intended.txt merge=custom\n");
+        harness.git(["config", "merge.custom.driver", "printf 'custom merge driver\\n' > %A"]);
         harness.write("intended.txt", BASE);
         harness.commit_all("base");
         harness.write("intended.txt", BASELINE);
@@ -81,6 +83,7 @@ fn baseline_exclusion_handles_nearby_unrelated_edits() {
 #[test]
 fn baseline_exclusion_rejects_overlapping_edits_without_mutation() {
     let harness = Harness::new("baseline-overlap");
+    harness.write(".git/info/attributes", "intended.txt merge=union\n");
     harness.write("intended.txt", BASE);
     harness.commit_all("base");
     harness.write("intended.txt", BASELINE);

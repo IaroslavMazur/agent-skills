@@ -11,7 +11,7 @@ use crate::{
     cli::{DiffMode, PrepareArgs},
     config, coord,
     error::{AppError, Result},
-    git::{Repository, copy_file, decode_nul_paths, git_error, literal_pathspec, validate_safe_path_text},
+    git::{Repository, copy_file, decode_nul_paths, git_error, literal_pathspec, output_text, validate_safe_path_text},
     rules,
     state::{MessageFormat, Store, Transaction, TransactionStatus, now_seconds},
 };
@@ -576,19 +576,27 @@ fn apply_baseline(
     if patch.is_empty() {
         return Ok(true);
     }
-    // The baseline blob separates owned edits from nearby excluded changes in patch context.
-    let applied = repository.with_input(
-        ["apply", "--cached", "--3way", "--whitespace=nowarn", "-"],
-        &patch,
-        Some(prepared_index),
-    )?;
-    if !applied.status.success() {
-        return Err(AppError::usage(format!(
-            "baseline changes do not apply cleanly to prepared HEAD for path: {}",
-            baseline.path
-        )));
+    let applied =
+        repository.with_input(["apply", "--cached", "--whitespace=nowarn", "-"], &patch, Some(prepared_index))?;
+    if applied.status.success() {
+        return Ok(true);
     }
-    Ok(true)
+
+    // Merge blobs directly so attributes cannot invoke custom or conflict-resolving merge drivers.
+    if let (Some(head), Some(worktree)) =
+        (repository.tree_entry(base_head, &baseline.path)?, repository.tree_entry(worktree_tree, &baseline.path)?)
+    {
+        let merged = repository.raw(["merge-file", "--object-id", &head.oid, &baseline.oid, &worktree.oid], None)?;
+        if merged.status.success() {
+            let oid = output_text(merged)?;
+            repository.checked(
+                ["update-index", "--add", "--cacheinfo", &worktree.mode, &oid, &baseline.path],
+                Some(prepared_index),
+            )?;
+            return Ok(true);
+        }
+    }
+    Err(AppError::usage(format!("baseline changes do not apply cleanly to prepared HEAD for path: {}", baseline.path)))
 }
 
 fn changed_paths(repository: &Repository, base_head: &str, prepared_tree: &str) -> Result<Vec<String>> {
