@@ -45,6 +45,62 @@ fn baseline_exclusion_commits_only_baseline_to_worktree_delta() {
 }
 
 #[test]
+fn baseline_exclusion_handles_nearby_unrelated_edits() {
+    for automatic in [false, true] {
+        let harness = Harness::new("baseline-nearby");
+        harness.write("intended.txt", BASE);
+        harness.commit_all("base");
+        harness.write("intended.txt", BASELINE);
+        let baseline_oid = harness.git(["hash-object", "-w", "intended.txt"]);
+        let worktree = BASELINE.replace("line 04", "line 04 agent");
+        harness.write("intended.txt", &worktree);
+        let index_before = harness.git(["hash-object", ".git/index"]);
+        let head_before = harness.git(["rev-parse", "HEAD"]);
+        let specification = format!("intended.txt={baseline_oid}");
+        let output = if automatic {
+            write_executable(
+                &harness.shim.join("ai-coord"),
+                &format!("#!/bin/sh\n[ \"$1\" = baseline ] && printf 'intended.txt\\t{baseline_oid}\\n'\n"),
+            );
+            harness.success(["prepare", "--porcelain", "--", "intended.txt"])
+        } else {
+            harness.success(["prepare", "--porcelain", "--exclude-baseline", &specification, "--", "intended.txt"])
+        };
+        assert_eq!(harness.git(["hash-object", ".git/index"]), index_before);
+        assert_eq!(harness.git(["rev-parse", "HEAD"]), head_before);
+        assert_eq!(harness.read("intended.txt"), worktree);
+
+        let transaction = prepared_id(&stdout(&output));
+        harness.success(["commit", &transaction, "-m", "test: exclude nearby baseline"]);
+        assert_eq!(harness.git(["show", "HEAD:intended.txt"]), BASE.replace("line 04", "line 04 agent").trim_end());
+        assert_eq!(harness.read("intended.txt"), worktree);
+        assert_eq!(harness.git(["status", "--short"]), " M intended.txt");
+    }
+}
+
+#[test]
+fn baseline_exclusion_rejects_overlapping_edits_without_mutation() {
+    let harness = Harness::new("baseline-overlap");
+    harness.write("intended.txt", BASE);
+    harness.commit_all("base");
+    harness.write("intended.txt", BASELINE);
+    let baseline_oid = harness.git(["hash-object", "-w", "intended.txt"]);
+    let worktree = BASELINE.replace("line 02 stray", "line 02 agent");
+    harness.write("intended.txt", &worktree);
+    let index_before = harness.git(["hash-object", ".git/index"]);
+    let head_before = harness.git(["rev-parse", "HEAD"]);
+    let specification = format!("intended.txt={baseline_oid}");
+
+    let output = harness.command(["prepare", "--exclude-baseline", &specification, "--", "intended.txt"]);
+    assert_eq!(exit_code(&output), 2, "{}", stderr(&output));
+    assert!(stderr(&output).contains("baseline changes do not apply cleanly"));
+    assert_eq!(harness.git(["hash-object", ".git/index"]), index_before);
+    assert_eq!(harness.git(["rev-parse", "HEAD"]), head_before);
+    assert_eq!(harness.read("intended.txt"), worktree);
+    assert!(!harness.repo.join(".git/index.lock").exists());
+}
+
+#[test]
 fn baseline_exclusion_runs_strict_hook_against_snapshot() {
     let harness = Harness::new("baseline-snapshot-hook");
     harness.write("intended.txt", BASE);

@@ -576,21 +576,17 @@ fn apply_baseline(
     if patch.is_empty() {
         return Ok(true);
     }
-    let check = repository.with_input(
-        ["apply", "--cached", "--check", "--whitespace=nowarn", "-"],
+    // The baseline blob separates owned edits from nearby excluded changes in patch context.
+    let applied = repository.with_input(
+        ["apply", "--cached", "--3way", "--whitespace=nowarn", "-"],
         &patch,
         Some(prepared_index),
     )?;
-    if !check.status.success() {
+    if !applied.status.success() {
         return Err(AppError::usage(format!(
             "baseline changes do not apply cleanly to prepared HEAD for path: {}",
             baseline.path
         )));
-    }
-    let applied =
-        repository.with_input(["apply", "--cached", "--whitespace=nowarn", "-"], &patch, Some(prepared_index))?;
-    if !applied.status.success() {
-        return Err(git_error(applied));
     }
     Ok(true)
 }
