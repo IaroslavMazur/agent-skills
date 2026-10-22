@@ -84,6 +84,39 @@ class NamingLedgerTests(unittest.TestCase):
             self.assertTrue(final["complete"])
             self.assertEqual(final["counts"]["accounted"], 4)
 
+    def test_untracked_paths_match_ls_files_others(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = make_repo(root)
+            (repo / ".gitignore").write_text("ignored/\n*.log\n!keep.log\n")
+            (repo / "moved.py").write_text("v = 1\n")
+            git(repo, "add", ".gitignore", "moved.py")
+            git(repo, "commit", "-qm", "initial")
+            (repo / "ignored").mkdir()
+            (repo / "ignored" / "f.txt").write_text("x\n")
+            (repo / "x.log").write_text("x\n")
+            (repo / "keep.log").write_text("x\n")
+            (repo / "deep" / "er").mkdir(parents=True)
+            (repo / "deep" / "er" / "u.txt").write_text("x\n")
+            (repo / "with space.txt").write_text("x\n")
+            (repo / "caf\u00e9.txt").write_text("x\n")
+            git(repo, "mv", "moved.py", "renamed.py")
+            (repo / "moved.py").write_text("v = 2\n")
+            ledger = root / "ledger.json"
+            self.helper("init", "--root", str(repo), "--ledger", str(ledger))
+            recorded = {item["path"] for item in json.loads(ledger.read_text())["files"]}
+            listed = subprocess.run(
+                ["git", "-C", str(repo), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+                capture_output=True, check=True,
+            ).stdout
+            expected = {value.decode() for value in listed.split(b"\0") if value}
+            self.assertEqual(recorded, expected)
+            self.assertIn("moved.py", recorded)
+            self.assertIn("deep/er/u.txt", recorded)
+            self.assertIn("keep.log", recorded)
+            self.assertNotIn("x.log", recorded)
+            self.assertNotIn("ignored/f.txt", recorded)
+
     def test_mark_is_atomic_and_blocked_prevents_completion(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

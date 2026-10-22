@@ -296,6 +296,61 @@ class RepoRenameTests(unittest.TestCase):
         self.assertEqual(config.read_text(), f'project = "{new_path}"\nother = "old-repo"\n')
         self.assertEqual(json.loads(session.read_text())["cwd"], new_path)
 
+    def continuity_fixture(self) -> tuple[Path, Path]:
+        codex = self.root / "prefilter-codex"
+        sessions = codex / "sessions" / "2026"
+        sessions.mkdir(parents=True)
+        old_root = self.repo.resolve()
+        needle = str(old_root)
+        (sessions / "hit.jsonl").write_text(f"{needle}\n{needle}/src\n", encoding="utf-8")
+        (sessions / ".hidden.jsonl").write_text(needle, encoding="utf-8")
+        (sessions / "miss.jsonl").write_text("unrelated\n", encoding="utf-8")
+        (sessions / "binary.bin").write_bytes(b"\0" + needle.encode())
+        (sessions / "link.jsonl").symlink_to(sessions / "hit.jsonl")
+        (codex / "config.toml").write_text(f'project = "{needle}"\n', encoding="utf-8")
+        return codex, old_root
+
+    def collect(self, codex: Path, old_root: Path) -> list[tuple[str, int]]:
+        env = {"HOME": self.env["HOME"], "CODEX_HOME": str(codex), "CLAUDE_CONFIG_DIR": str(self.root / "no-claude")}
+        with patch.dict(os.environ, env):
+            items = HELPER.collect_replacements(old_root, self.root / "new-repo", "old-repo", "new-repo")
+        return [(str(item.path), item.occurrences) for item in items if str(item.path).startswith(str(codex))]
+
+    def test_prefilter_matches_full_scan(self) -> None:
+        codex, old_root = self.continuity_fixture()
+        if HELPER.shutil.which("rg") is None:
+            self.skipTest("rg is not on PATH")
+        filtered = self.collect(codex, old_root)
+        with patch.object(HELPER, "prefilter", side_effect=lambda files, roots, pairs: files):
+            full = self.collect(codex, old_root)
+        self.assertEqual(filtered, full)
+        names = {Path(path).name: count for path, count in filtered}
+        self.assertEqual(names, {"hit.jsonl": 2, ".hidden.jsonl": 1, "config.toml": 1})
+
+    def test_prefilter_falls_back_without_rg(self) -> None:
+        codex, old_root = self.continuity_fixture()
+        no_rg = self.root / "no-rg-bin"
+        no_rg.mkdir()
+        (no_rg / "git").symlink_to(HELPER.shutil.which("git") or "git")
+        with patch.dict(os.environ, {"PATH": str(no_rg)}):
+            self.assertIsNone(HELPER.shutil.which("rg"))
+            files = [codex / "sessions" / "2026" / "hit.jsonl", codex / "sessions" / "2026" / "miss.jsonl"]
+            self.assertEqual(HELPER.prefilter(files, [codex / "sessions"], ((b"x", b"y"),)), files)
+            fallback = self.collect(codex, old_root)
+        names = {Path(path).name: count for path, count in fallback}
+        self.assertEqual(names, {"hit.jsonl": 2, ".hidden.jsonl": 1, "config.toml": 1})
+
+    def test_prefilter_falls_back_on_rg_error(self) -> None:
+        codex, _ = self.continuity_fixture()
+        bad = self.root / "bad-bin"
+        bad.mkdir()
+        rg = bad / "rg"
+        rg.write_text("#!/bin/sh\nexit 2\n", encoding="utf-8")
+        rg.chmod(rg.stat().st_mode | stat.S_IXUSR)
+        files = [codex / "sessions" / "2026" / "miss.jsonl"]
+        with patch.dict(os.environ, {"PATH": f"{bad}:{os.environ['PATH']}"}):
+            self.assertEqual(HELPER.prefilter(files, [codex / "sessions"], ((b"x", b"y"),)), files)
+
     def test_custom_claude_project_is_moved(self) -> None:
         claude = self.root / "custom-claude"
         self.env["CLAUDE_CONFIG_DIR"] = str(claude)
