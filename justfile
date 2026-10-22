@@ -79,6 +79,18 @@ alias pw := prettier-write
 @pre-commit:
     sh .husky/pre-commit
 
+# Lint and check formatting of Python helpers and tests with ruff; pass paths to scope
+[group("checks")]
+[positional-arguments]
+@python-check *paths:
+    if [ "$#" -eq 0 ]; then ruff check skills tests && ruff format --check skills tests; else ruff check "$@" && ruff format --check "$@"; fi
+
+# Apply safe ruff fixes and format Python helpers and tests; pass paths to scope
+[group("checks")]
+[positional-arguments]
+@python-fix *paths:
+    if [ "$#" -eq 0 ]; then ruff check --fix skills tests && ruff format skills tests; else ruff check --fix "$@" && ruff format "$@"; fi
+
 # Run every Python test script
 [group("checks")]
 @python-test:

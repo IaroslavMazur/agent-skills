@@ -90,6 +90,10 @@ obvious:
 
 - After editing Markdown, run `just prettier-write <changed files>` then `just prettier-check <changed files>`, in that
   order. If `prettier-check` fails, fix only the files you changed.
+- After editing Python, run `just python-fix <changed files>` then `just python-check <changed files>`, in that order.
+  Both wrap ruff, configured in `ruff.toml` at 120 columns. `python-check` lints and checks formatting. `python-fix`
+  applies safe lint fixes and formats. Fix the remaining findings by hand or narrow the code, and use an inline
+  suppression only for a one-off with a reason. Without paths, both recipes cover `skills` and `tests`.
 - The root `package.json` exists only for local formatting, type-checking, and hook wiring. There is no build step.
 - CLI changes go live only via `just toolkit::install-cli`, under the install-authorization rules in
   `toolkit/AGENTS.md`.
@@ -115,7 +119,7 @@ All checks run locally. Do not add CI workflows or rely on remote checks for com
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
 | Skill metadata, dependencies, README table | Run `just skill-check`. Verify referenced files and documented commands for changed skills.                              |
 | Shell helpers or tests                     | Run `just shell-check <changed files>` and the affected shell tests. Use `just bats-test tests/<skill>` for Bats suites. |
-| Python helpers or tests                    | Run the affected `tests/<skill>/test*.py` scripts with `uv run`.                                                         |
+| Python helpers or tests                    | Run `just python-check <changed files>` and the affected `tests/<skill>/test*.py` scripts with `uv run`.                 |
 | Root Bun TypeScript helpers                | `just typescript-check` and the affected tests (`just publish-skills-test` or `just evm-atlas-test`).                    |
 | evm-atlas generated inputs or references   | Run `just evm-atlas-check`. Change canonical inputs and regenerate derivatives rather than editing generated files.      |
 | Shared catalog tooling or test wiring      | `just test` and `just skill-check`, plus shell linting for changed shell files.                                          |
