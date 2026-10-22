@@ -32,7 +32,7 @@ From a clone, `just toolkit::install-cli` installs the supported CLIs into `~/.l
 
 | Skill                | Category      | Description                                                               |
 | -------------------- | ------------- | ------------------------------------------------------------------------- |
-| agents-brain         | Agent tooling | Maintain repo context and create or maintain repo-local skills            |
+| agents-brain         | Agent tooling | Maintain repo context and create AGENTS.md files or repo-local skills     |
 | agents-docs          | Agent tooling | Fetch current official Codex and Claude Code docs, including hooks/trust  |
 | agents-introspection | Agent tooling | Assess recurrence risk from Codex/Claude Code transcript history          |
 | agents-system        | Agent tooling | Redesign repo systems for agent understanding, control, and learning      |
