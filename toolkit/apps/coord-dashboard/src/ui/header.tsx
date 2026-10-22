@@ -51,7 +51,9 @@ export function Header({
       if (provider.dropped > 0) {
         return `${provider.client} dropped ${provider.dropped}`;
       }
-      return `${provider.client} unavailable`;
+      return provider.error
+        ? `${provider.client} unavailable (${provider.error})`
+        : `${provider.client} unavailable`;
     })
     .join(", ");
   const hasUpdate = lastUpdated !== null;
