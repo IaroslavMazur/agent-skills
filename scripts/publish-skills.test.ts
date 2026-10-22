@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 type InstallTarget = "claude-code" | "codex" | "shared";
 type Drift = { kind: string; skill: string; target: string };
-type RepoClaim = { canonical: boolean; paths: Array<{ path: string; scope: "file" | "recursive" }>; root: string };
+type RepoClaim = { paths: Array<{ path: string; scope: "file" | "recursive" }>; root: string };
 type PlanJson = {
   clean: boolean;
   drifts: Drift[];
@@ -72,7 +72,7 @@ test("plan and check cover clean shared and restricted installs, content, modes,
   assert(alpha.json.drifts.some((drift) => drift.skill === "alpha" && drift.kind === "content"));
   assert(!alpha.json.drifts.some((drift) => drift.skill === "beta"));
   assert.deepEqual(alpha.json.repos, [
-    { canonical: true, paths: [{ path: "skills/alpha", scope: "recursive" }], root: fixture.agentsRoot },
+    { paths: [{ path: "skills/alpha", scope: "recursive" }], root: fixture.agentsRoot },
   ]);
 
   const gamma = runJson(fixture, "plan", "--json", "--skill", "gamma");
@@ -124,7 +124,6 @@ test("planner detects target layout, symlink, deletion, and stale lock metadata"
   const claudeClaim = json.repos.find((claim) => claim.root === fixture.claudeRoot);
   assert(agentsClaim, "expected an agents-root claim");
   assert(claudeClaim, "expected a claude-root claim");
-  assert.equal(agentsClaim.canonical, true);
   assert.deepEqual(
     agentsClaim.paths.find((entry) => entry.path === "skills/gone"),
     { path: "skills/gone", scope: "recursive" },
@@ -202,7 +201,7 @@ test("planner rejects frontmatter name that does not match its directory", () =>
   assert.match(result.stderr, /does not match directory/);
 });
 
-test("pure-remove plans mark the only claimed repository canonical", () => {
+test("pure-remove plans claim only the installed repository", () => {
   const fixture = createFixture();
   const lock = readLock(fixture);
   lock.skills.gone = lockEntry(fixture, "alpha", { skillPath: "skills/gone/SKILL.md" });
@@ -215,7 +214,7 @@ test("pure-remove plans mark the only claimed repository canonical", () => {
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(json.groups.remove, ["gone"]);
   assert.deepEqual(json.repos, [
-    { canonical: true, paths: [{ path: "skills/gone", scope: "recursive" }], root: fixture.agentsRoot },
+    { paths: [{ path: "skills/gone", scope: "recursive" }], root: fixture.agentsRoot },
   ]);
 });
 

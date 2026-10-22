@@ -62,7 +62,7 @@ type ProcessLock = { owner: string; token: string };
 type GlobalChanges = { lockChanged: boolean; paths: string[] };
 type TargetPaths = Record<"agents" | "claude" | "codex", string>;
 type ClaimScope = "file" | "recursive";
-type RepoClaim = { canonical: boolean; paths: Array<{ path: string; scope: ClaimScope }>; root: string };
+type RepoClaim = { paths: Array<{ path: string; scope: ClaimScope }>; root: string };
 
 const repository = "PaulRBerg/agent-skills";
 const sourceUrl = "https://github.com/PaulRBerg/agent-skills.git";
@@ -849,12 +849,7 @@ function buildRepoClaims(plan: Plan): RepoClaim[] {
     }
   }
 
-  const roots = [...perRoot.keys()].sort();
-  const preferredRoot =
-    plan.groups.shared.length > 0 || plan.groups.codex.length > 0 ? config.agentsRoot : config.claudeRoot;
-  const canonicalRoot = perRoot.has(preferredRoot) ? preferredRoot : roots[0];
-  return roots.map((root) => ({
-    canonical: root === canonicalRoot,
+  return [...perRoot.keys()].sort().map((root) => ({
     paths: [...perRoot.get(root)!.entries()]
       .sort(([left], [right]) => compareNames(left, right))
       .map(([claimPath, scope]) => ({ path: claimPath, scope })),
