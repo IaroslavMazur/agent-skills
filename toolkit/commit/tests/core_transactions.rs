@@ -767,3 +767,29 @@ fn configured_validation_stops_retryably_when_the_branch_keeps_moving() {
     assert!(stdout(&harness.success(["show", &transaction])).starts_with(&format!("PREPARED {transaction}\n")));
     assert!(!harness.repo.join(".git/index.lock").exists());
 }
+
+#[test]
+fn prepare_accepts_absolute_paths_spelled_through_a_symlinked_prefix() {
+    let harness = Harness::new("absolute-symlink-prefix");
+    harness.write("base.txt", "base\n");
+    harness.commit_all("base");
+    harness.write("intended.txt", "intended\n");
+    harness.write("deleted.txt", "deleted\n");
+    harness.commit_all("add files");
+    fs::remove_file(harness.repo.join("deleted.txt")).unwrap();
+    harness.write("intended.txt", "changed\n");
+
+    let link_root = harness.root.join("link-root");
+    std::os::unix::fs::symlink(&harness.repo, &link_root).unwrap();
+    let intended = link_root.join("intended.txt");
+    let deleted = link_root.join("deleted.txt");
+    let (_, stdout) = harness.prepare(&[intended.to_str().unwrap(), deleted.to_str().unwrap()]);
+    assert!(stdout.contains("\tintended.txt"), "{stdout}");
+    assert!(stdout.contains("\tdeleted.txt"), "{stdout}");
+
+    let outside = harness.root.join("outside.txt");
+    fs::write(&outside, "outside\n").unwrap();
+    let output = harness.command(["prepare", "--", outside.to_str().unwrap()]);
+    assert_eq!(exit_code(&output), 2);
+    assert!(stderr(&output).contains("outside the repository"), "{}", stderr(&output));
+}

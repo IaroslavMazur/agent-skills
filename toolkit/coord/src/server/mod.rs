@@ -245,7 +245,13 @@ fn host_hostname(host: &str) -> Option<&str> {
         return None;
     }
     if let Some(rest) = host.strip_prefix('[') {
-        return rest.split(']').next().filter(|value| !value.is_empty());
+        // Only an optional `:<port>` may follow the bracketed address.
+        let (name, suffix) = rest.split_once(']')?;
+        let port_ok = suffix.is_empty() ||
+            suffix
+                .strip_prefix(':')
+                .is_some_and(|port| !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit()));
+        return (!name.is_empty() && port_ok).then_some(name);
     }
     match host.rsplit_once(':') {
         Some((name, port))
@@ -593,6 +599,15 @@ mod tests {
         stream.read_to_string(&mut response).await.unwrap();
         assert!(response.starts_with("HTTP/1.0 400"), "{response}");
         server.abort();
+    }
+
+    #[test]
+    fn host_hostname_rejects_text_after_a_bracketed_address() {
+        assert_eq!(host_hostname("[::1]"), Some("::1"));
+        assert_eq!(host_hostname("[::1]:4477"), Some("::1"));
+        for host in ["[::1]evil.example", "[::1]:", "[::1]:4477x", "[]", "[::1"] {
+            assert_eq!(host_hostname(host), None, "{host}");
+        }
     }
 
     #[tokio::test]

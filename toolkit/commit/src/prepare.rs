@@ -1,7 +1,7 @@
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
     env, fs,
-    path::{Component, Path},
+    path::{Component, Path, PathBuf},
 };
 
 use rand::random;
@@ -195,10 +195,14 @@ fn normalize_inputs(repository: &Repository, inputs: &[String]) -> Result<Vec<St
         validate_safe_path_text(input)?;
         let input_path = Path::new(input);
         let relative = if input_path.is_absolute() {
+            // The repository root is canonical, so an input spelled through a symlinked prefix such as macOS
+            // `/tmp` only matches after resolution. Resolve only when the literal path does not match, so
+            // in-repository symlinks keep their literal paths.
             input_path
                 .strip_prefix(&repository.root)
+                .map(Path::to_path_buf)
+                .or_else(|_| resolve_absolute(input_path).strip_prefix(&repository.root).map(Path::to_path_buf))
                 .map_err(|_| AppError::usage(format!("path is outside the repository: {input}")))?
-                .to_path_buf()
         } else {
             cwd_relative.join(input_path)
         };
@@ -208,6 +212,17 @@ fn normalize_inputs(repository: &Repository, inputs: &[String]) -> Result<Vec<St
         }
     }
     Ok(normalized)
+}
+
+/// Canonicalizes an absolute input, or its parent when the file itself no longer exists.
+fn resolve_absolute(path: &Path) -> PathBuf {
+    if let Ok(resolved) = path.canonicalize() {
+        return resolved;
+    }
+    match (path.parent().and_then(|parent| parent.canonicalize().ok()), path.file_name()) {
+        (Some(parent), Some(name)) => parent.join(name),
+        _ => path.to_path_buf(),
+    }
 }
 
 fn normalize_relative(path: &Path, original: &str) -> Result<String> {
