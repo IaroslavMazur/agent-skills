@@ -55,6 +55,20 @@ release() {
   [[ "$output" == *"release=effect@4.0.2" ]]
 }
 
+@test "stale fetches skip per-package tags and prune deleted release tags" {
+  "$SCRIPT" >/dev/null
+  release 4.0.2
+  git -C "$ORIGIN" tag -d effect@4.0.0 >/dev/null
+  echo 0 >"$EFFECT_SOURCE_DIR/.git/effect-source-fetched-at"
+
+  run --separate-stderr "$SCRIPT"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"release=effect@4.0.2" ]]
+  run ! git -C "$EFFECT_SOURCE_DIR" rev-parse -q --verify refs/tags/@effect/vitest@4.0.2
+  run ! git -C "$EFFECT_SOURCE_DIR" rev-parse -q --verify refs/tags/effect@4.0.0
+}
+
 @test "falls back to the cache when the fetch fails" {
   "$SCRIPT" >/dev/null
   rm -rf "$ORIGIN"
