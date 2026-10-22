@@ -11,7 +11,6 @@ import unittest
 from pathlib import Path
 from typing import Any
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 INSPECTOR = REPO_ROOT / "skills/agents-introspection/scripts/transcript-inspect.py"
 

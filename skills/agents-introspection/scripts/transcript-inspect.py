@@ -29,7 +29,6 @@ from transcript_common import (
     truncate,
 )
 
-
 CODEX_RECORD_TYPES = {"session_meta", "turn_context", "response_item"}
 ENTRY_TEXT_LIMIT = 240
 DEFAULT_MAX_ENTRIES = 120

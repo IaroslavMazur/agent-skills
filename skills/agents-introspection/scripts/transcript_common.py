@@ -7,10 +7,10 @@ import json
 import os
 import re
 from collections import Counter, deque
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Literal
-
+from typing import Any, Literal
 
 EMAIL_RE = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 API_KEY_RE = re.compile(r"\b(?:sk|pk|rk|ghp|github_pat|xox[baprs])-[A-Za-z0-9_\-]{16,}\b")
@@ -344,8 +344,8 @@ def parse_utc_timestamp(value: str | None) -> dt.datetime | None:
     except ValueError:
         return None
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=dt.timezone.utc)
-    return parsed.astimezone(dt.timezone.utc)
+        parsed = parsed.replace(tzinfo=dt.UTC)
+    return parsed.astimezone(dt.UTC)
 
 
 def file_modified_time(path: Path) -> dt.datetime | None:
@@ -353,11 +353,11 @@ def file_modified_time(path: Path) -> dt.datetime | None:
         mtime = path.stat().st_mtime
     except OSError:
         return None
-    return dt.datetime.fromtimestamp(mtime, tz=dt.timezone.utc)
+    return dt.datetime.fromtimestamp(mtime, tz=dt.UTC)
 
 
 def format_utc_iso(value: dt.datetime) -> str:
-    return value.astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return value.astimezone(dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def parse_jsonl_line(line: str) -> Any | None:

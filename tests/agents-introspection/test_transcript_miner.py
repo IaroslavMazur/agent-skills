@@ -14,10 +14,9 @@ import unittest
 from pathlib import Path
 from typing import Any
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MINER = REPO_ROOT / "skills/agents-introspection/scripts/transcript-miner.py"
-FIXTURE_TIMESTAMP = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+FIXTURE_TIMESTAMP = (dt.datetime.now(dt.UTC) - dt.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 class MinerFixture:
@@ -499,7 +498,7 @@ class TranscriptMinerTests(unittest.TestCase):
         self.fixture.codex_session("recent", project, user="needle recent")
         old_dir = self.fixture.codex_home / "sessions" / "2020" / "01" / "01"
         old_codex = self.fixture.codex_session("old", project, user="needle old", session_dir=old_dir)
-        old_mtime = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=400)).timestamp()
+        old_mtime = (dt.datetime.now(dt.UTC) - dt.timedelta(days=400)).timestamp()
         os.utime(old_codex, (old_mtime, old_mtime))
         revived_dir = self.fixture.codex_home / "sessions" / "2020" / "02" / "02"
         self.fixture.codex_session("revived", project, user="needle revived recently", session_dir=revived_dir)
@@ -528,7 +527,7 @@ class TranscriptMinerTests(unittest.TestCase):
 
     def test_since_confirms_fresh_mtime_with_last_record_timestamp(self) -> None:
         project = self.fixture.project("since-content")
-        stale = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=400)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        stale = (dt.datetime.now(dt.UTC) - dt.timedelta(days=400)).strftime("%Y-%m-%dT%H:%M:%SZ")
         self.fixture.codex_session("stale-content", project, user="needle stale", timestamp=stale)
         self.fixture.codex_session("fresh-content", project, user="needle fresh")
         self.fixture.codex_session("no-timestamp", project, user="needle missing", timestamp=None)
