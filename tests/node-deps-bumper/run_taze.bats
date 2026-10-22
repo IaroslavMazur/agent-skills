@@ -113,7 +113,7 @@ assert_taze_args() {
   run "$helper" --include eslint,react --concurrency 4 "$project"
 
   [ "$status" -eq 0 ]
-  assert_taze_args $'major\n--force\n-r\n--include\neslint,react\n--concurrency\n4\n--include-locked'
+  assert_taze_args $'major\n--force\n--no-github-actions\n--no-node-version\n-r\n--include\neslint,react\n--concurrency\n4\n--include-locked'
 }
 
 @test "uses pnpm workspace files to enable recursive scans" {
@@ -123,7 +123,7 @@ assert_taze_args() {
   run "$helper" "$project"
 
   [ "$status" -eq 0 ]
-  assert_taze_args $'major\n--force\n-r\n--include-locked'
+  assert_taze_args $'major\n--force\n--no-github-actions\n--no-node-version\n-r\n--include-locked'
 }
 
 @test "requires an explicit selection before writing and forbids plan and write together" {
@@ -139,7 +139,7 @@ assert_taze_args() {
 
   run "$helper" --write --include react "$project"
   [ "$status" -eq 0 ]
-  assert_taze_args $'major\n--force\n--include\nreact\n--write'
+  assert_taze_args $'major\n--force\n--no-github-actions\n--no-node-version\n--include\nreact\n--write'
 }
 
 @test "mirrors Bun maturity period and supported exclusions" {
@@ -155,7 +155,7 @@ EOF
   run "$helper" "$project"
 
   [ "$status" -eq 0 ]
-  assert_taze_args $'major\n--force\n--maturity-period\n2\n--maturity-period-exclude\nreact,@types/node\n--include-locked'
+  assert_taze_args $'major\n--force\n--no-github-actions\n--no-node-version\n--maturity-period\n2\n--maturity-period-exclude\nreact,@types/node\n--include-locked'
 }
 
 @test "does not pass unsupported Bun maturity exclusions" {
@@ -170,7 +170,7 @@ EOF
   run "$helper" "$project"
 
   [ "$status" -eq 0 ]
-  assert_taze_args $'major\n--force\n--maturity-period\n1\n--include-locked'
+  assert_taze_args $'major\n--force\n--no-github-actions\n--no-node-version\n--maturity-period\n1\n--include-locked'
 }
 
 @test "inherits global Bun policy and multiline exclusions for both scan and write" {
@@ -188,12 +188,12 @@ EOF
 
   run "$helper" --include react "$project"
   [ "$status" -eq 0 ]
-  assert_taze_args $'major\n--force\n--include\nreact\n--maturity-period\n7\n--maturity-period-exclude\nreact,@types/node\n--include-locked'
+  assert_taze_args $'major\n--force\n--no-github-actions\n--no-node-version\n--include\nreact\n--maturity-period\n7\n--maturity-period-exclude\nreact,@types/node\n--include-locked'
 
   printf '%s\n' '[install]' 'linker = "hoisted"' >"$project/bunfig.toml"
   run "$helper" --write --include react "$project"
   [ "$status" -eq 0 ]
-  assert_taze_args $'major\n--force\n--include\nreact\n--maturity-period\n7\n--maturity-period-exclude\nreact,@types/node\n--write'
+  assert_taze_args $'major\n--force\n--no-github-actions\n--no-node-version\n--include\nreact\n--maturity-period\n7\n--maturity-period-exclude\nreact,@types/node\n--write'
 }
 
 @test "uses XDG global config and overlays individual local policy keys" {
@@ -212,17 +212,17 @@ EOF
 
   run "$helper" "$project"
   [ "$status" -eq 0 ]
-  assert_taze_args $'major\n--force\n--maturity-period\n7\n--include-locked'
+  assert_taze_args $'major\n--force\n--no-github-actions\n--no-node-version\n--maturity-period\n7\n--include-locked'
 
   printf '%s\n' '[install]' 'minimumReleaseAge = 90000' >"$project/bunfig.toml"
   run "$helper" "$project"
   [ "$status" -eq 0 ]
-  assert_taze_args $'major\n--force\n--maturity-period\n2\n--maturity-period-exclude\nreact\n--include-locked'
+  assert_taze_args $'major\n--force\n--no-github-actions\n--no-node-version\n--maturity-period\n2\n--maturity-period-exclude\nreact\n--include-locked'
 
   printf '%s\n' '[install]' 'minimumReleaseAge = 0' >"$project/bunfig.toml"
   run "$helper" "$project"
   [ "$status" -eq 0 ]
-  assert_taze_args $'major\n--force\n--include-locked'
+  assert_taze_args $'major\n--force\n--no-github-actions\n--no-node-version\n--include-locked'
 }
 
 @test "does not apply user Bun policy to other package managers" {
@@ -231,7 +231,7 @@ EOF
 
   run "$helper" "$project"
   [ "$status" -eq 0 ]
-  assert_taze_args $'major\n--force\n--include-locked'
+  assert_taze_args $'major\n--force\n--no-github-actions\n--no-node-version\n--include-locked'
   [ ! -e "$uv_log" ]
 }
 
@@ -241,7 +241,7 @@ EOF
 
   run "$helper" "$project"
   [ "$status" -eq 0 ]
-  assert_taze_args $'major\n--force\n--include-locked'
+  assert_taze_args $'major\n--force\n--no-github-actions\n--no-node-version\n--include-locked'
 }
 
 @test "invalid Bun policy fails before Taze without exposing config contents" {
@@ -271,7 +271,7 @@ EOF
 
   [ "$status" -eq 0 ]
   [ "$output" = '{"updates":[]}' ]
-  assert_taze_args $'major\n--force\n--include\nreact\n--include-locked\n--no-group\n--no-timediff\n--no-nodecompat\n--sort\nname-asc'
+  assert_taze_args $'major\n--force\n--no-github-actions\n--no-node-version\n--include\nreact\n--include-locked\n--no-group\n--no-timediff\n--no-nodecompat\n--sort\nname-asc'
   [ "$(sed -n '1p' "$uv_log")" = 'run' ]
   [ "$(sed -n '2p' "$uv_log")" = "$repo_root/skills/node-deps-bumper/scripts/parse-taze-plan.py" ]
   [ "$(sed -n '3p' "$uv_log")" = '--input' ]
