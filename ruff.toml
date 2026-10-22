@@ -1,1 +1,2 @@
 cache-dir = ".cache/ruff"
+line-length = 120
