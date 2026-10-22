@@ -54,8 +54,8 @@ impl ProviderContext {
         codex_home: PathBuf,
         claude_config_dir: PathBuf,
     ) -> Self {
-        let codex_executable = codex_executable.map(|path| resolved_context_path(&path));
-        let claude_executable = claude_executable.map(|path| resolved_context_path(&path));
+        let codex_executable = codex_executable.map(|path| absolute_path(&path));
+        let claude_executable = claude_executable.map(|path| absolute_path(&path));
         let codex_home = resolved_context_path(&codex_home);
         let claude_config_dir = resolved_context_path(&claude_config_dir);
         let cache_key = provider_context_key(
@@ -308,13 +308,13 @@ pub(crate) fn inventory_result(providers: Vec<ProviderReport>) -> InventoryResul
 pub(crate) fn discover_executable(name: &str) -> Option<PathBuf> {
     if name.contains(std::path::MAIN_SEPARATOR) {
         let path = PathBuf::from(name);
-        return is_executable(&path).then(|| resolved_context_path(&path));
+        return is_executable(&path).then(|| absolute_path(&path));
     }
     let search_path = env::var_os("PATH")?;
     env::split_paths(&search_path)
         .map(|directory| directory.join(name))
         .find(|candidate| is_executable(candidate))
-        .map(|candidate| resolved_context_path(&candidate))
+        .map(|candidate| absolute_path(&candidate))
 }
 
 fn provider_report(
@@ -354,13 +354,17 @@ fn provider_context_key(
 }
 
 fn resolved_context_path(path: &Path) -> PathBuf {
-    std::fs::canonicalize(path).unwrap_or_else(|_| {
-        if path.is_absolute() {
-            path.to_owned()
-        } else {
-            env::current_dir().map_or_else(|_| path.to_owned(), |cwd| cwd.join(path))
-        }
-    })
+    std::fs::canonicalize(path).unwrap_or_else(|_| absolute_path(path))
+}
+
+/// Executables keep their symlink path: self-updating CLIs repoint the link
+/// and prune the old target, which a long-lived server would keep invoking.
+fn absolute_path(path: &Path) -> PathBuf {
+    if path.is_absolute() {
+        path.to_owned()
+    } else {
+        env::current_dir().map_or_else(|_| path.to_owned(), |cwd| cwd.join(path))
+    }
 }
 
 fn is_executable(path: &Path) -> bool {
@@ -536,6 +540,28 @@ mod tests {
         assert_eq!(observation.report.dropped, 0);
         assert_eq!(observation.sessions.len(), 1);
         assert_eq!(observation.sessions[0].identity.session_id, "ready");
+    }
+
+    #[test]
+    fn executable_symlink_survives_target_replacement() {
+        let temp = TempDir::new().unwrap();
+        let old_target = temp.path().join("claude-1");
+        let new_target = temp.path().join("claude-2");
+        for target in [&old_target, &new_target] {
+            fs::write(target, "#!/bin/sh\nprintf '[]'\n").unwrap();
+            fs::set_permissions(target, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let link = temp.path().join("claude");
+        std::os::unix::fs::symlink(&old_target, &link).unwrap();
+        let context = ProviderContext::new(None, Some(link.clone()), temp.path().into(), temp.path().into());
+
+        fs::remove_file(&link).unwrap();
+        std::os::unix::fs::symlink(&new_target, &link).unwrap();
+        fs::remove_file(&old_target).unwrap();
+
+        let observation = collect_claude_inventory(context.claude_executable.as_deref(), &FakeProbe);
+        assert!(observation.report.ok, "{:?}", observation.report.error);
+        assert!(observation.authoritative);
     }
 
     #[test]
