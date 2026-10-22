@@ -775,17 +775,21 @@ fn prepare_accepts_absolute_paths_spelled_through_a_symlinked_prefix() {
     harness.commit_all("base");
     harness.write("intended.txt", "intended\n");
     harness.write("deleted.txt", "deleted\n");
+    harness.write("gone/nested.txt", "nested\n");
     harness.commit_all("add files");
     fs::remove_file(harness.repo.join("deleted.txt")).unwrap();
+    fs::remove_dir_all(harness.repo.join("gone")).unwrap();
     harness.write("intended.txt", "changed\n");
+    std::os::unix::fs::symlink("intended.txt", harness.repo.join("link.txt")).unwrap();
 
     let link_root = harness.root.join("link-root");
     std::os::unix::fs::symlink(&harness.repo, &link_root).unwrap();
-    let intended = link_root.join("intended.txt");
-    let deleted = link_root.join("deleted.txt");
-    let (_, stdout) = harness.prepare(&[intended.to_str().unwrap(), deleted.to_str().unwrap()]);
-    assert!(stdout.contains("\tintended.txt"), "{stdout}");
-    assert!(stdout.contains("\tdeleted.txt"), "{stdout}");
+    let inputs = ["intended.txt", "deleted.txt", "gone/nested.txt", "link.txt"]
+        .map(|path| link_root.join(path).to_str().unwrap().to_owned());
+    let (_, stdout) = harness.prepare(&inputs.each_ref().map(String::as_str));
+    for path in ["intended.txt", "deleted.txt", "gone/nested.txt", "link.txt"] {
+        assert!(stdout.contains(&format!("\t{path}")), "{stdout}");
+    }
 
     let outside = harness.root.join("outside.txt");
     fs::write(&outside, "outside\n").unwrap();

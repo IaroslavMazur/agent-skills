@@ -196,13 +196,10 @@ fn normalize_inputs(repository: &Repository, inputs: &[String]) -> Result<Vec<St
         let input_path = Path::new(input);
         let relative = if input_path.is_absolute() {
             // The repository root is canonical, so an input spelled through a symlinked prefix such as macOS
-            // `/tmp` only matches after resolution. Resolve only when the literal path does not match, so
-            // in-repository symlinks keep their literal paths.
-            input_path
-                .strip_prefix(&repository.root)
-                .map(Path::to_path_buf)
-                .or_else(|_| resolve_absolute(input_path).strip_prefix(&repository.root).map(Path::to_path_buf))
-                .map_err(|_| AppError::usage(format!("path is outside the repository: {input}")))?
+            // `/tmp` only matches after resolution. Resolve only the prefix that names the root, so
+            // in-repository symlinks and deleted paths keep their literal spelling.
+            strip_root(input_path, &repository.root)
+                .ok_or_else(|| AppError::usage(format!("path is outside the repository: {input}")))?
         } else {
             cwd_relative.join(input_path)
         };
@@ -214,15 +211,14 @@ fn normalize_inputs(repository: &Repository, inputs: &[String]) -> Result<Vec<St
     Ok(normalized)
 }
 
-/// Canonicalizes an absolute input, or its parent when the file itself no longer exists.
-fn resolve_absolute(path: &Path) -> PathBuf {
-    if let Ok(resolved) = path.canonicalize() {
-        return resolved;
+/// Returns `path` relative to the canonical `root`, matching literally first and then through the
+/// nearest ancestor that resolves to `root`.
+fn strip_root(path: &Path, root: &Path) -> Option<PathBuf> {
+    if let Ok(relative) = path.strip_prefix(root) {
+        return Some(relative.to_path_buf());
     }
-    match (path.parent().and_then(|parent| parent.canonicalize().ok()), path.file_name()) {
-        (Some(parent), Some(name)) => parent.join(name),
-        _ => path.to_path_buf(),
-    }
+    let ancestor = path.ancestors().find(|ancestor| ancestor.canonicalize().is_ok_and(|resolved| resolved == root))?;
+    path.strip_prefix(ancestor).ok().map(Path::to_path_buf)
 }
 
 fn normalize_relative(path: &Path, original: &str) -> Result<String> {

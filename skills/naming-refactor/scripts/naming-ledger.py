@@ -84,7 +84,11 @@ def ensure_external_ledger(root: Path, ledger: Path) -> Path:
 def exclusive(path: Path):
     """Serialize read-modify-write cycles from concurrent callers on a sidecar lock."""
     lock = path.with_name(f"{path.name}.lock")
-    with lock.open("a") as handle:
+    try:
+        handle = lock.open("a")
+    except OSError as exc:
+        raise LedgerError(f"cannot lock ledger: {exc}") from exc
+    with handle:
         fcntl.flock(handle, fcntl.LOCK_EX)
         try:
             yield
