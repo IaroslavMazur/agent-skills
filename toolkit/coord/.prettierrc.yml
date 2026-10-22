@@ -7,3 +7,6 @@ overrides:
     options:
       printWidth: 100
       trailingComma: "none"
+  - files: "CHANGELOG.md"
+    options:
+      proseWrap: "preserve"
