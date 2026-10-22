@@ -868,7 +868,7 @@ fn script_resource() -> &'static Regex {
 
 fn completion_evidence() -> &'static Regex {
     static VALUE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-    VALUE.get_or_init(|| Regex::new(r"(?im)^##+[^\n]*\b(?:completion|verify|verification|validation|output|report|result|exit codes)\b|\b(?:success means|complete when|completion requires|completion is|finish with)\b").unwrap())
+    VALUE.get_or_init(|| Regex::new(r"(?im)^##+[^\n]*\b(?:completion|verify|verification|validation|output|report|result|receipt|exit codes)\b|\b(?:success means|complete when|completion requires|completion is|finish with)\b").unwrap())
 }
 
 fn requirement() -> &'static Regex {

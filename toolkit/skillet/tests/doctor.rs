@@ -66,6 +66,22 @@ fn finding<'a>(report: &'a Value, code: &str) -> &'a Value {
 }
 
 #[test]
+fn receipt_heading_counts_as_completion_evidence() {
+    let root = TempDir::new().unwrap();
+    write_skill(root.path(), "receipted", "", "## Receipt\n\nReturn the receipt.");
+    write_skill(root.path(), "bare", "", "No contract.");
+    let (_, report) = run_json(root.path(), &[]);
+    let missing: Vec<_> = report["findings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|finding| finding["code"] == "COMPLETION_EVIDENCE_MISSING")
+        .collect();
+    assert_eq!(missing.len(), 1, "{missing:?}");
+    assert!(missing[0].to_string().contains("bare"));
+}
+
+#[test]
 fn clean_catalog_has_schema_v1_valid_json_and_text() {
     let root = clean_catalog();
     let (output, report) = run_json(root.path(), &[]);
