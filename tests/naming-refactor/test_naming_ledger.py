@@ -26,7 +26,7 @@ def make_repo(root: Path) -> Path:
 
 class NamingLedgerTests(unittest.TestCase):
     def helper(self, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
-        result = subprocess.run([sys.executable, str(SCRIPT), *args], text=True, capture_output=True)
+        result = subprocess.run([sys.executable, str(SCRIPT), *args], check=False, text=True, capture_output=True)
         if check:
             self.assertEqual(result.returncode, 0, result.stderr)
         return result

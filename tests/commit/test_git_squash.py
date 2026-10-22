@@ -13,7 +13,7 @@ SCRIPT = REPO_ROOT / "skills" / "commit" / "scripts" / "git-squash.py"
 
 
 def git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
-    result = subprocess.run(["git", "-C", str(repo), *args], text=True, capture_output=True)
+    result = subprocess.run(["git", "-C", str(repo), *args], check=False, text=True, capture_output=True)
     if check and result.returncode:
         raise AssertionError(result.stderr)
     return result
@@ -45,7 +45,7 @@ def head(repo: Path) -> str:
 
 class GitSquashTests(unittest.TestCase):
     def helper(self, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
-        result = subprocess.run([sys.executable, str(SCRIPT), *args], text=True, capture_output=True)
+        result = subprocess.run([sys.executable, str(SCRIPT), *args], check=False, text=True, capture_output=True)
         if check:
             self.assertEqual(result.returncode, 0, result.stderr)
         return result

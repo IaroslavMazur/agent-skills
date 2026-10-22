@@ -50,6 +50,7 @@ class WatchCodexWaveTests(unittest.TestCase):
                     "--poll-seconds",
                     "0.01",
                 ],
+                check=False,
                 text=True,
                 capture_output=True,
                 timeout=5,
@@ -77,6 +78,7 @@ class WatchCodexWaveTests(unittest.TestCase):
                 progress.write_text(json.dumps({"type": "handoff.failed", "reason": reason}) + "\n")
                 result = subprocess.run(
                     ["bash", str(SCRIPT), "--agent", reason, "2", str(progress), "--poll-seconds", "0.01"],
+                    check=False,
                     text=True,
                     capture_output=True,
                     timeout=2,
@@ -102,6 +104,7 @@ class WatchCodexWaveTests(unittest.TestCase):
                     "--poll-seconds",
                     "0.01",
                 ],
+                check=False,
                 text=True,
                 capture_output=True,
                 timeout=2,
@@ -150,6 +153,7 @@ class WatchCodexWaveTests(unittest.TestCase):
                     "--poll-seconds",
                     "0.01",
                 ],
+                check=False,
                 text=True,
                 capture_output=True,
                 timeout=5,
@@ -251,7 +255,7 @@ class WatchCodexWaveTests(unittest.TestCase):
                 progress = Path(directory) / f"{name}.progress.jsonl"
                 progress.write_text(json.dumps(event) + "\n")
 
-                def finish() -> None:
+                def finish(progress: Path = progress) -> None:
                     time.sleep(0.08)
                     with progress.open("a") as handle:
                         handle.write('{"type":"handoff.completed"}\n')
@@ -271,6 +275,7 @@ class WatchCodexWaveTests(unittest.TestCase):
                         "--poll-seconds",
                         "0.01",
                     ],
+                    check=False,
                     text=True,
                     capture_output=True,
                     timeout=2,
@@ -303,6 +308,7 @@ class WatchCodexWaveTests(unittest.TestCase):
                     progress.write_text(content)
                     result = subprocess.run(
                         ["bash", str(SCRIPT), "--agent", "A1", "2", str(progress), "--poll-seconds", "0.01"],
+                        check=False,
                         text=True,
                         capture_output=True,
                         timeout=2,
@@ -316,6 +322,7 @@ class WatchCodexWaveTests(unittest.TestCase):
 
             result = subprocess.run(
                 ["bash", str(SCRIPT), "--agent", "A1", "2", str(unreadable), "--poll-seconds", "0.01"],
+                check=False,
                 text=True,
                 capture_output=True,
                 timeout=2,

@@ -217,7 +217,7 @@ class SelectModelTests(unittest.TestCase):
                 self.assertEqual(result["status"], "selected")
                 self.assertEqual(result["id"], expected_id)
                 self.assertEqual(result["rule"], "adjacent_tiers")
-                self.assertAlmostEqual(result["top_two_mass"], sorted(levels)[-1] + sorted(levels)[-2], places=3)
+                self.assertAlmostEqual(result["top_two_mass"], sum(sorted(levels)[-2:]), places=3)
                 self.assertLess(result["confidence"], ROUTER.CONFIDENCE_FLOOR)
 
     def test_distant_or_thin_splits_remain_abstentions(self):
@@ -331,7 +331,13 @@ class SelectModelTests(unittest.TestCase):
             ("x" * (ROUTER.MAX_BYTES + 1), "invalid_input"),
         ):
             result = subprocess.run(
-                [sys.executable, str(SCRIPT)], input=raw, text=True, capture_output=True, env=environment, timeout=2
+                [sys.executable, str(SCRIPT)],
+                input=raw,
+                check=False,
+                text=True,
+                capture_output=True,
+                env=environment,
+                timeout=2,
             )
             self.assertEqual(result.returncode, 0)
             self.assertEqual(json.loads(result.stdout), {"status": "fallback", "reason": reason})

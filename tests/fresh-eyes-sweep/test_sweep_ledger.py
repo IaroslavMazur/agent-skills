@@ -17,7 +17,7 @@ def git(repo: Path, *args: str) -> None:
 
 class SweepLedgerTests(unittest.TestCase):
     def helper(self, *args: str, check: bool = True):
-        result = subprocess.run([sys.executable, str(SCRIPT), *args], text=True, capture_output=True)
+        result = subprocess.run([sys.executable, str(SCRIPT), *args], check=False, text=True, capture_output=True)
         if check:
             self.assertEqual(result.returncode, 0, result.stderr)
         return result

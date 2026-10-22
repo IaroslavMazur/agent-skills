@@ -29,7 +29,7 @@ def git(repo: Path, *args: str) -> str:
 
 
 def run_inventory(*paths: Path | str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(["bun", "run", str(INVENTORY), *map(str, paths)], text=True, capture_output=True)
+    return subprocess.run(["bun", "run", str(INVENTORY), *map(str, paths)], check=False, text=True, capture_output=True)
 
 
 DONOR = {

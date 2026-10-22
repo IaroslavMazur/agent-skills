@@ -172,9 +172,11 @@ class RepoRenameTests(unittest.TestCase):
         subprocess.run(["git", "commit", "-qam", "path fixture"], cwd=self.repo, check=True)
         with patch.dict(os.environ, self.env, clear=True):
             plan = HELPER.preflight(str(self.repo), str(destination))
-        with patch.object(HELPER.os, "replace", side_effect=OSError("injected write failure")):
-            with self.assertRaisesRegex(HELPER.RenameError, "rollback completed"):
-                HELPER.apply(plan)
+        with (
+            patch.object(HELPER.os, "replace", side_effect=OSError("injected write failure")),
+            self.assertRaisesRegex(HELPER.RenameError, "rollback completed"),
+        ):
+            HELPER.apply(plan)
         self.assertEqual(readme.read_text(), old_text)
         self.assertFalse(destination.parent.parent.exists())
         status = subprocess.run(

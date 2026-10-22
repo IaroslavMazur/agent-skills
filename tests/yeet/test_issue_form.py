@@ -274,16 +274,17 @@ body:
 
     def test_malformed_gh_responses_and_missing_executable_are_form_errors(self) -> None:
         args = Namespace(input=None, repo="acme/demo", template="bug.yml")
-        with patch.object(MODULE.subprocess, "run", side_effect=FileNotFoundError):
-            with self.assertRaisesRegex(MODULE.FormError, "gh executable not found"):
-                MODULE.load_yaml_text(args)
+        with (
+            patch.object(MODULE.subprocess, "run", side_effect=FileNotFoundError),
+            self.assertRaisesRegex(MODULE.FormError, "gh executable not found"),
+        ):
+            MODULE.load_yaml_text(args)
         malformed = ["[]", '{"content": 4}', '{"type": "dir", "content": "eA=="}', '{"content": "not base64!"}']
         for output in malformed:
             with self.subTest(output=output):
                 result = subprocess.CompletedProcess(["gh"], 0, stdout=output, stderr="")
-                with patch.object(MODULE.subprocess, "run", return_value=result):
-                    with self.assertRaises(MODULE.FormError):
-                        MODULE.load_yaml_text(args)
+                with patch.object(MODULE.subprocess, "run", return_value=result), self.assertRaises(MODULE.FormError):
+                    MODULE.load_yaml_text(args)
 
     def test_malformed_render_forms_are_form_errors(self) -> None:
         bad_forms = [

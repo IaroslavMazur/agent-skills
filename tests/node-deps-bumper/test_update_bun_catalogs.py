@@ -15,6 +15,7 @@ class UpdateBunCatalogsTests(unittest.TestCase):
     def run_helper(self, root: Path, plan: Path, *extra: str, check: bool = True):
         result = subprocess.run(
             [sys.executable, str(SCRIPT), "--root", str(root), "--plan", str(plan), "--include", "react,jest", *extra],
+            check=False,
             text=True,
             capture_output=True,
         )
