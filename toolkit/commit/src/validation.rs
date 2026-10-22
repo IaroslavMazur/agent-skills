@@ -199,7 +199,7 @@ pub(crate) fn snapshot_drift_paths(
         snapshot.root(),
     )?;
     let mut paths = diff_paths(repository, candidate_tree, &current_tree)?.into_iter().collect::<BTreeSet<_>>();
-    paths.extend(worktree_diff_paths(repository, snapshot.validation_index(), snapshot.root(), &[])?);
+    paths.extend(worktree_diff_paths(repository, snapshot.validation_index(), snapshot.root())?);
     Ok(paths.into_iter().collect())
 }
 
@@ -303,21 +303,9 @@ fn apply_prepared_delta(
     Ok(())
 }
 
-fn worktree_diff_paths(
-    repository: &Repository,
-    index: &Path,
-    worktree: &Path,
-    paths: &[String],
-) -> Result<Vec<String>> {
-    let mut arguments = vec![
-        "diff-files".to_owned(),
-        "--name-only".to_owned(),
-        "--no-renames".to_owned(),
-        "-z".to_owned(),
-        "--".to_owned(),
-    ];
-    arguments.extend(paths.iter().map(|path| literal_pathspec(path)));
-    let bytes = repository.bytes_in_worktree(arguments, Some(index), worktree)?;
+fn worktree_diff_paths(repository: &Repository, index: &Path, worktree: &Path) -> Result<Vec<String>> {
+    let bytes =
+        repository.bytes_in_worktree(["diff-files", "--name-only", "--no-renames", "-z"], Some(index), worktree)?;
     decode_nul_paths(&bytes)
 }
 
@@ -354,6 +342,8 @@ fn recovery_actions(transaction_id: &str) -> String {
     )
 }
 
-fn short_oid(oid: &str) -> &str {
+// Receipts and diagnostics abbreviate commit OIDs for display; journal state,
+// refs, and `show` retain full OIDs for CAS and replay.
+pub(crate) fn short_oid(oid: &str) -> &str {
     oid.get(..12).unwrap_or(oid)
 }

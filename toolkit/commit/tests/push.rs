@@ -2,7 +2,7 @@ mod common;
 
 use std::{fs, process::Command};
 
-use common::{Harness, exit_code, git_at, stderr, stdout, write_executable};
+use common::{Harness, exit_code, git_at, git_binary, init_bare, stderr, stdout, write_executable};
 
 #[test]
 fn standalone_push_handles_existing_upstream_and_clean_ahead() {
@@ -635,23 +635,6 @@ fn commit_push_rebase_reports_rebased_integrated_and_pushed() {
     assert!(stdout(&replay).starts_with(&format!("PUSHED {transaction} ")), "{}", stdout(&replay));
 }
 
-fn init_bare(path: &std::path::Path, home: &std::path::Path) {
-    let output = Command::new("git")
-        .args(["init", "--bare", "--quiet"])
-        .arg(path)
-        .env("HOME", home)
-        .env("XDG_CONFIG_HOME", home.join(".config"))
-        .env("GIT_CONFIG_NOSYSTEM", "1")
-        .env("GIT_CONFIG_GLOBAL", "/dev/null")
-        .env("GIT_CONFIG_SYSTEM", "/dev/null")
-        .env_remove("GIT_INDEX_FILE")
-        .env_remove("GIT_DIR")
-        .env_remove("GIT_WORK_TREE")
-        .output()
-        .unwrap();
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
-}
-
 fn clone_repository(remote: &std::path::Path, destination: &std::path::Path, home: &std::path::Path) {
     let output = Command::new("git")
         .args(["clone", "--quiet", "--branch", "main"])
@@ -671,10 +654,4 @@ fn clone_repository(remote: &std::path::Path, destination: &std::path::Path, hom
     git_at(destination, home, ["config", "user.name", "AI Commit Test"]);
     git_at(destination, home, ["config", "user.email", "ai-commit@example.com"]);
     git_at(destination, home, ["config", "commit.gpgsign", "false"]);
-}
-
-fn git_binary() -> std::path::PathBuf {
-    let output = Command::new("sh").args(["-c", "command -v git"]).output().unwrap();
-    assert!(output.status.success());
-    std::path::PathBuf::from(String::from_utf8(output.stdout).unwrap().trim())
 }

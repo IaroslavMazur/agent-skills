@@ -310,28 +310,6 @@ fn cross_repository_create_uses_desktop_and_requires_repository_order() {
 }
 
 #[test]
-fn check_validates_without_writing() {
-    let harness = Harness::new("check");
-    let repository = harness.repo("repo", true);
-    let output = harness.command([
-        "create",
-        "--check",
-        "--repo",
-        repository.to_str().unwrap(),
-        "--category",
-        "research",
-        "--task",
-        "validate only",
-        "CHECK_ONLY.md",
-    ]);
-    assert!(output.status.success(), "{}", stderr(&output));
-    assert!(!repository.join(".ai").exists());
-    let report = stdout(&output);
-    assert_eq!(report.lines().count(), 3);
-    assert!(report.contains(&format!("target\t{}/.ai/task-handoffs/CHECK_ONLY.md", repository.display())));
-}
-
-#[test]
 fn archive_moves_handoff_under_home_archive() {
     let harness = Harness::new("archive");
     let source = harness.root.join("origin/.ai/task-handoffs/ARCHIVE_ME.md");

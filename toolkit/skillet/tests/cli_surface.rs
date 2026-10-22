@@ -49,55 +49,32 @@ fn doctor_help_lists_its_supported_options() {
 }
 
 #[test]
-fn map_supports_repeatable_roots_and_skills() {
-    let cli = Cli::try_parse_from([
-        "ai-skillet",
-        "map",
-        "--root",
-        "first",
-        "--root",
-        "second",
-        "--skill",
-        "alpha",
-        "--skill",
-        "beta",
-        "--format",
-        "json",
-    ])
-    .expect("map arguments should parse");
+fn map_and_doctor_support_repeatable_roots_and_skills() {
+    for subcommand in ["map", "doctor"] {
+        let cli = Cli::try_parse_from([
+            "ai-skillet",
+            subcommand,
+            "--root",
+            "first",
+            "--root",
+            "second",
+            "--skill",
+            "alpha",
+            "--skill",
+            "beta",
+            "--format",
+            "json",
+        ])
+        .unwrap_or_else(|error| panic!("{subcommand} arguments should parse: {error}"));
 
-    let Command::Map(args) = cli.command else {
-        panic!("expected map command");
-    };
-    assert_eq!(args.root, [PathBuf::from("first"), PathBuf::from("second")]);
-    assert_eq!(args.skill, ["alpha", "beta"]);
-    assert_eq!(args.format, MapFormat::Json);
-}
-
-#[test]
-fn doctor_supports_repeatable_roots_and_skills() {
-    let cli = Cli::try_parse_from([
-        "ai-skillet",
-        "doctor",
-        "--root",
-        "first",
-        "--root",
-        "second",
-        "--skill",
-        "alpha",
-        "--skill",
-        "beta",
-        "--format",
-        "json",
-    ])
-    .expect("doctor arguments should parse");
-
-    let Command::Doctor(args) = cli.command else {
-        panic!("expected doctor command");
-    };
-    assert_eq!(args.root, [PathBuf::from("first"), PathBuf::from("second")]);
-    assert_eq!(args.skill, ["alpha", "beta"]);
-    assert_eq!(args.format, DoctorFormat::Json);
+        let (root, skill, json) = match cli.command {
+            Command::Map(args) => (args.root, args.skill, args.format == MapFormat::Json),
+            Command::Doctor(args) => (args.root, args.skill, args.format == DoctorFormat::Json),
+        };
+        assert_eq!(root, [PathBuf::from("first"), PathBuf::from("second")], "{subcommand}");
+        assert_eq!(skill, ["alpha", "beta"], "{subcommand}");
+        assert!(json, "{subcommand}");
+    }
 }
 
 #[test]

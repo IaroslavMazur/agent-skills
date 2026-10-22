@@ -7,7 +7,9 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use common::{Harness, exit_code, git_at, stderr, stdout, write_executable};
+use common::{
+    Harness, configure_validator, exit_code, git_at, git_binary, prepared_id, stderr, stdout, write_executable,
+};
 
 #[test]
 fn validation_failure_preserves_the_immutable_transaction_and_explains_recovery() {
@@ -651,16 +653,6 @@ fn stat_only_rewrites_by_validators_and_snapshot_hooks_are_not_drift() {
     assert_eq!(harness.git(["show", "HEAD:intended.txt"]), "prepared");
 }
 
-fn configure_validator(harness: &Harness, source: &str) -> std::path::PathBuf {
-    let validator = harness.root.join("validator");
-    write_executable(&validator, source);
-    harness.write(
-        ".agents/commit.toml",
-        &format!("[message]\nformat = \"conventional\"\n[validation]\ncommand = [\"{}\"]\n", validator.display()),
-    );
-    validator
-}
-
 fn transaction_refs(harness: &Harness, transaction: &str) -> Vec<String> {
     ["transactions", "bases", "indexes"]
         .into_iter()
@@ -680,14 +672,4 @@ fn validated_tree(transaction: &str, output: &std::process::Output) -> String {
     assert_eq!(fields[0], "VALIDATED");
     assert_eq!(fields[1], transaction);
     fields[2].to_owned()
-}
-
-fn prepared_id(output: &str) -> String {
-    output.lines().find_map(|line| line.strip_prefix("PREPARED\t")).expect("PREPARED record").to_owned()
-}
-
-fn git_binary() -> std::path::PathBuf {
-    let output = std::process::Command::new("sh").args(["-c", "command -v git"]).output().unwrap();
-    assert!(output.status.success());
-    std::path::PathBuf::from(String::from_utf8(output.stdout).unwrap().trim())
 }

@@ -216,21 +216,6 @@ impl SessionStore {
         }
     }
 
-    /// Exports every schema column in newest-first order. `days` limits rows to the recent window.
-    pub fn export_to_json(&self, output_path: &Path, days: Option<u32>) -> usize {
-        let Some(connection) = self.connection("export sessions") else {
-            return 0;
-        };
-        let records = match self.read_records(&connection, days) {
-            Ok(records) => records,
-            Err(error) => {
-                tracing::error!(%error, "failed to read sessions for export");
-                return 0;
-            }
-        };
-        Self::write_export(output_path, &records)
-    }
-
     /// Writes `records` to `output_path` as pretty JSON, returning the number of rows written.
     fn write_export(output_path: &Path, records: &[SessionRecord]) -> usize {
         let result: Result<()> = (|| {
@@ -396,24 +381,6 @@ impl SessionStore {
         }
     }
 
-    fn read_records(&self, connection: &Connection, days: Option<u32>) -> rusqlite::Result<Vec<SessionRecord>> {
-        const SELECT: &str =
-            "SELECT id, session_id, created_at, prompt, cwd, job_number, stopped_at, last_wait_at, duration_seconds
-                              FROM sessions";
-        let mut statement = match days {
-            Some(_) => connection.prepare(&format!(
-                "{SELECT} WHERE created_at >= datetime('now', ?1) ORDER BY created_at DESC, id DESC"
-            ))?,
-            None => connection.prepare(&format!("{SELECT} ORDER BY created_at DESC, id DESC"))?,
-        };
-        let modifier = days.map(|days| format!("-{days} days"));
-        let rows = match modifier.as_deref() {
-            Some(modifier) => statement.query_map([modifier], record_from_row)?,
-            None => statement.query_map([], record_from_row)?,
-        };
-        rows.collect()
-    }
-
     /// Reads the rows that `cleanup_old_data` is about to delete for the given `-N days` modifier.
     fn read_expired_records(&self, connection: &Connection, modifier: &str) -> rusqlite::Result<Vec<SessionRecord>> {
         let mut statement = connection.prepare(
@@ -561,14 +528,16 @@ mod tests {
     }
 
     #[test]
-    fn export_contains_all_schema_columns_newest_first() {
+    fn expired_export_contains_all_schema_columns_newest_first() {
         let directory = tempdir().unwrap();
         let store = SessionStore::from_database_path(directory.path().join("sessions.db")).unwrap();
         store.track_prompt("session-1", "first", "/one");
         store.track_prompt("session-2", "second", "/two");
+        let connection = store.connection("export test").unwrap();
+        let records = store.read_expired_records(&connection, "+1 days").unwrap();
         let output = directory.path().join("exports/sessions.json");
 
-        assert_eq!(store.export_to_json(&output, None), 2);
+        assert_eq!(SessionStore::write_export(&output, &records), 2);
         let value: serde_json::Value = serde_json::from_slice(&fs::read(output).unwrap()).unwrap();
         let sessions = value.as_array().unwrap();
         assert_eq!(sessions[0]["prompt"], "second");

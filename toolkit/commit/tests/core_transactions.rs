@@ -2,7 +2,7 @@ mod common;
 
 use std::fs;
 
-use common::{Harness, exit_code, stderr, stdout, write_executable};
+use common::{Harness, configure_validator, exit_code, git_binary, stderr, stdout, write_executable};
 
 #[test]
 fn intended_snapshot_preserves_later_index_and_unrelated_staging() {
@@ -766,19 +766,4 @@ fn configured_validation_stops_retryably_when_the_branch_keeps_moving() {
     assert_eq!(harness.git(["rev-list", "--count", "HEAD"]), "4");
     assert!(stdout(&harness.success(["show", &transaction])).starts_with(&format!("PREPARED {transaction}\n")));
     assert!(!harness.repo.join(".git/index.lock").exists());
-}
-
-fn configure_validator(harness: &Harness, source: &str) {
-    let validator = harness.root.join("validator");
-    write_executable(&validator, source);
-    harness.write(
-        ".agents/commit.toml",
-        &format!("[message]\nformat = \"conventional\"\n[validation]\ncommand = [\"{}\"]\n", validator.display()),
-    );
-}
-
-fn git_binary() -> std::path::PathBuf {
-    let output = std::process::Command::new("sh").args(["-c", "command -v git"]).output().unwrap();
-    assert!(output.status.success());
-    std::path::PathBuf::from(String::from_utf8(output.stdout).unwrap().trim())
 }

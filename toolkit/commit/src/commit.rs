@@ -21,7 +21,7 @@ use crate::{
     state::{PendingCommit, Store, Transaction, TransactionStatus, now_seconds},
     validation::{
         Candidate, ValidationSnapshot, build_candidate, diff_paths, ensure_branch, finish_snapshot_hook,
-        intended_paths_differ_from_worktree, run_configured, snapshot_drift_paths, transaction_repository,
+        intended_paths_differ_from_worktree, run_configured, short_oid, snapshot_drift_paths, transaction_repository,
     },
 };
 
@@ -674,12 +674,6 @@ fn reconcile_shared_index(
     Ok(())
 }
 
-// Receipts and diagnostics abbreviate commit OIDs for display; journal state,
-// refs, and `show` retain full OIDs for CAS and replay.
-fn short_oid(oid: &str) -> &str {
-    oid.get(..12).unwrap_or(oid)
-}
-
 fn print_commit_receipt(transaction: &Transaction) {
     for path in &transaction.hook_added {
         println!("HOOK_ADDED {path}");
@@ -757,7 +751,8 @@ fn disclose_rebased_commit(repository: &Repository, transaction: &Transaction) -
             Ok(())
         }
         Integration::Superseded => Err(AppError::operational(format!(
-            "branch was pushed after the rebase, but HEAD no longer carries the content of transaction {}; inspect              the branch",
+            "branch was pushed after the rebase, but HEAD no longer carries the content of transaction {}; inspect \
+             the branch",
             transaction.id
         ))),
     }

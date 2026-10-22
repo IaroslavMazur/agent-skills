@@ -94,24 +94,7 @@ impl Harness {
         K: AsRef<OsStr>,
         V: AsRef<OsStr>,
     {
-        let mut command = AssertCommand::cargo_bin("ai-commit").expect("binary should be built for integration tests");
-        command
-            .current_dir(&self.repo)
-            .env("HOME", &self.home)
-            .env("AI_COMMIT_STATE_DIR", &self.state)
-            .env("XDG_CONFIG_HOME", self.root.join("config"))
-            .env("GIT_CONFIG_NOSYSTEM", "1")
-            .env("GIT_CONFIG_GLOBAL", "/dev/null")
-            .env("GIT_CONFIG_SYSTEM", "/dev/null")
-            .env_remove("GIT_INDEX_FILE")
-            .env_remove("GIT_DIR")
-            .env_remove("GIT_WORK_TREE")
-            .env_remove("AI_COMMIT_CONFIG")
-            .env_remove("AI_COMMIT_TEST_COORD_TIMEOUT_MS")
-            .env_remove("AI_COMMIT_TEST_FAIL_AFTER_REF_UPDATE")
-            .env("PATH", &self.search_path)
-            .args(args);
-        command.envs(environment).output().unwrap()
+        self.ai_commit(&self.repo).args(args).envs(environment).output().unwrap()
     }
 
     pub fn command_at<I, S>(&self, directory: &Path, args: I) -> Output
@@ -119,6 +102,10 @@ impl Harness {
         I: IntoIterator<Item = S>,
         S: AsRef<OsStr>,
     {
+        self.ai_commit(directory).args(args).output().unwrap()
+    }
+
+    fn ai_commit(&self, directory: &Path) -> AssertCommand {
         let mut command = AssertCommand::cargo_bin("ai-commit").expect("binary should be built for integration tests");
         command
             .current_dir(directory)
@@ -134,9 +121,8 @@ impl Harness {
             .env_remove("AI_COMMIT_CONFIG")
             .env_remove("AI_COMMIT_TEST_COORD_TIMEOUT_MS")
             .env_remove("AI_COMMIT_TEST_FAIL_AFTER_REF_UPDATE")
-            .env("PATH", &self.search_path)
-            .args(args);
-        command.output().unwrap()
+            .env("PATH", &self.search_path);
+        command
     }
 
     pub fn git_input<I, S>(&self, args: I, input: &[u8]) -> String
@@ -190,8 +176,7 @@ impl Harness {
         arguments.extend_from_slice(paths);
         let output = self.success(arguments);
         let stdout = String::from_utf8(output.stdout).unwrap();
-        let id = stdout.lines().find_map(|line| line.strip_prefix("PREPARED\t")).expect("PREPARED record").to_owned();
-        (id, stdout)
+        (prepared_id(&stdout), stdout)
     }
 
     pub fn transaction_json(&self, id: &str) -> PathBuf {
@@ -248,6 +233,43 @@ pub fn stderr(output: &Output) -> String {
 
 pub fn exit_code(output: &Output) -> i32 {
     output.status.code().expect("process exit code")
+}
+
+pub fn prepared_id(output: &str) -> String {
+    output.lines().find_map(|line| line.strip_prefix("PREPARED\t")).expect("PREPARED record").to_owned()
+}
+
+pub fn configure_validator(harness: &Harness, source: &str) -> PathBuf {
+    let validator = harness.root.join("validator");
+    write_executable(&validator, source);
+    harness.write(
+        ".agents/commit.toml",
+        &format!("[message]\nformat = \"conventional\"\n[validation]\ncommand = [\"{}\"]\n", validator.display()),
+    );
+    validator
+}
+
+pub fn init_bare(path: &Path, home: &Path) {
+    let output = Command::new("git")
+        .args(["init", "--bare", "--quiet"])
+        .arg(path)
+        .env("HOME", home)
+        .env("XDG_CONFIG_HOME", home.join(".config"))
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_SYSTEM", "/dev/null")
+        .env_remove("GIT_INDEX_FILE")
+        .env_remove("GIT_DIR")
+        .env_remove("GIT_WORK_TREE")
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+}
+
+pub fn git_binary() -> PathBuf {
+    let output = Command::new("sh").args(["-c", "command -v git"]).output().unwrap();
+    assert!(output.status.success());
+    PathBuf::from(String::from_utf8(output.stdout).unwrap().trim())
 }
 
 fn assert_success(output: Output, command: &'static str) -> Output {

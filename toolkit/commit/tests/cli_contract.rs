@@ -4,7 +4,7 @@ use ai_commit::cli::{Cli, Command};
 use clap::Parser;
 use std::{fs, time::Instant};
 
-use common::{Harness, exit_code, stderr, stdout, write_executable};
+use common::{Harness, exit_code, prepared_id, stderr, stdout, write_executable};
 
 #[test]
 fn commit_messages_accept_hyphen_leading_paragraphs() {
@@ -470,10 +470,6 @@ fn signing_failure_is_retryable_and_explicit_bypass_succeeds() {
     assert!(stderr(&failed).contains("failed to sign"));
     let bypassed = harness.success(["commit", &transaction, "-m", "test: unsigned", "--no-gpg-sign"]);
     assert!(stdout(&bypassed).contains("COMMITTED"));
-}
-
-fn prepared_id(output: &str) -> String {
-    output.lines().find_map(|line| line.strip_prefix("PREPARED\t")).expect("PREPARED record").to_owned()
 }
 
 fn assert_format(output: &std::process::Output, expected: &str) {

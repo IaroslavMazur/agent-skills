@@ -52,11 +52,6 @@ pub struct ClaudeHooksReport {
 }
 
 impl ClaudeHooksReport {
-    /// The first settings file that contributes an ai-notify command.
-    pub fn path(&self) -> Option<&Path> {
-        self.paths.first().map(PathBuf::as_path)
-    }
-
     /// A CLI should use this to turn malformed inspected files into a non-zero result.
     pub fn has_errors(&self) -> bool {
         !self.errors.is_empty()

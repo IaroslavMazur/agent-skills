@@ -430,14 +430,17 @@ mod tests {
         let directory = tempdir().unwrap();
         let malformed = directory.path().join("malformed.yaml");
         let invalid = directory.path().join("invalid.yaml");
+        let invalid_level = directory.path().join("invalid-level.yaml");
         fs::write(&malformed, "cleanup: [").unwrap();
         fs::write(&invalid, "cleanup:\n  retention_days: 0\nnotification:\n  threshold_seconds: 99\n").unwrap();
+        fs::write(&invalid_level, "logging:\n  level: verbose\nnotification:\n  threshold_seconds: 99\n").unwrap();
 
-        for path in [malformed, invalid] {
+        for path in [malformed, invalid, invalid_level] {
             let loaded = ConfigLoader::new(path).load_report();
             assert_eq!(loaded.source, ConfigSource::Defaults);
             assert!(loaded.warning.is_some());
             assert_eq!(loaded.config.notification.threshold_seconds, 10);
+            assert_eq!(loaded.config.logging.level, LogLevel::Info);
         }
     }
 
@@ -460,17 +463,5 @@ mod tests {
         assert!(text.contains("path: /tmp/custom.db  # Path to SQLite database file"));
         assert!(text.contains("path: /tmp/custom.log  # Path to log file"));
         assert_eq!(&*ConfigLoader::new(path).load_report().config, &config);
-    }
-
-    #[test]
-    fn invalid_log_level_falls_back_to_defaults() {
-        let directory = tempdir().unwrap();
-        let path = directory.path().join("config.yaml");
-        fs::write(&path, "logging:\n  level: verbose\n").unwrap();
-
-        let loaded = ConfigLoader::new(path).load_report();
-
-        assert_eq!(loaded.source, ConfigSource::Defaults);
-        assert_eq!(loaded.config.logging.level, LogLevel::Info);
     }
 }

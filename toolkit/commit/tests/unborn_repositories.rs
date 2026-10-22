@@ -1,8 +1,10 @@
 mod common;
 
-use std::{fs, path::Path, process::Command};
+use std::fs;
 
-use common::{Harness, exit_code, git_at, stderr, stdout, write_executable};
+use common::{
+    Harness, exit_code, git_at, git_binary, git_output_at, init_bare, prepared_id, stderr, stdout, write_executable,
+};
 
 #[test]
 fn explicit_prepare_creates_a_root_commit_without_creating_an_index() {
@@ -227,7 +229,7 @@ fn initial_commit_pushes_a_new_branch_and_standalone_push_rejects_unborn_head() 
     assert_eq!(exit_code(&failed), 2);
     assert!(stderr(&failed).contains("HEAD has no commit"));
     assert!(
-        !git_at_output(&remote, &unborn.home, ["show-ref", "--verify", "--quiet", &format!("refs/heads/{branch}")])
+        !git_output_at(&remote, &unborn.home, ["show-ref", "--verify", "--quiet", &format!("refs/heads/{branch}")])
             .status
             .success()
     );
@@ -257,10 +259,6 @@ fn legacy_journals_without_unborn_or_optional_parent_fields_remain_readable() {
     assert!(stdout(&harness.success(["show", &transaction])).contains("unborn\tfalse\n"));
 }
 
-fn prepared_id(output: &str) -> String {
-    output.lines().find_map(|line| line.strip_prefix("PREPARED\t")).expect("PREPARED record").to_owned()
-}
-
 fn create_root(harness: &Harness, path: &str, contents: &str, message: &str) -> String {
     let blob = harness.git_input(["hash-object", "-w", "--stdin"], contents.as_bytes());
     let tree = harness.git_input(["mktree"], format!("100644 blob {blob}\t{path}\n").as_bytes());
@@ -276,42 +274,4 @@ fn create_child(harness: &Harness, path: &str, contents: &str, message: &str) ->
     let commit = harness.git(["commit-tree", &tree, "-p", &parent, "-m", message]);
     harness.git(["update-ref", "HEAD", &commit, &parent]);
     commit
-}
-
-fn init_bare(path: &Path, home: &Path) {
-    let output = Command::new("git")
-        .args(["init", "--bare", "--quiet"])
-        .arg(path)
-        .env("HOME", home)
-        .env("XDG_CONFIG_HOME", home.join(".config"))
-        .env("GIT_CONFIG_NOSYSTEM", "1")
-        .env("GIT_CONFIG_GLOBAL", "/dev/null")
-        .env("GIT_CONFIG_SYSTEM", "/dev/null")
-        .output()
-        .unwrap();
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
-}
-
-fn git_at_output<I, S>(repository: &Path, home: &Path, args: I) -> std::process::Output
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<std::ffi::OsStr>,
-{
-    Command::new("git")
-        .arg("-C")
-        .arg(repository)
-        .env("HOME", home)
-        .env("XDG_CONFIG_HOME", home.join(".config"))
-        .env("GIT_CONFIG_NOSYSTEM", "1")
-        .env("GIT_CONFIG_GLOBAL", "/dev/null")
-        .env("GIT_CONFIG_SYSTEM", "/dev/null")
-        .args(args)
-        .output()
-        .unwrap()
-}
-
-fn git_binary() -> std::path::PathBuf {
-    let output = Command::new("sh").args(["-c", "command -v git"]).output().unwrap();
-    assert!(output.status.success());
-    std::path::PathBuf::from(String::from_utf8(output.stdout).unwrap().trim())
 }

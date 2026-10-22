@@ -212,27 +212,14 @@ impl Repository {
             input.push(0);
         }
         let mut command = self.command_in_worktree(Some(index), worktree)?;
-        command
-            .args(["check-ignore", "-z", "--stdin"])
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        let mut child = command
-            .spawn()
-            .map_err(|error| AppError::operational(format!("cannot execute git check-ignore: {error}")))?;
-        let mut stdin = child.stdin.take().expect("piped stdin");
-        // Write stdin on a separate thread while this thread drains stdout/stderr: with large
-        // inputs and outputs, writing all of stdin before reading any output can fill both pipe
-        // buffers and deadlock the child and parent against each other.
-        let writer = std::thread::spawn(move || stdin.write_all(&input));
-        let output = child.wait_with_output().map_err(AppError::from)?;
-        let written = writer.join().map_err(|_| AppError::operational("git check-ignore input writer panicked"))?;
+        command.args(["check-ignore", "-z", "--stdin"]);
+        let (output, written) = run_with_input(command, &input)?;
         // Git's own failure is actionable; a broken pipe after it exited is only a consequence.
         if !output.status.success() && output.status.code() != Some(1) {
             return Err(git_error(output));
         }
         // Results from truncated input would silently omit ignored paths.
-        written.map_err(AppError::from)?;
+        written?;
         if output.status.success() { decode_nul_paths(&output.stdout) } else { Ok(Vec::new()) }
     }
 
@@ -291,22 +278,11 @@ impl Repository {
         S: AsRef<OsStr>,
     {
         let mut command = self.command(index);
-        command.args(args).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
-        let mut child =
-            command.spawn().map_err(|error| AppError::operational(format!("cannot execute git: {error}")))?;
-        let mut stdin = child.stdin.take().expect("piped stdin");
-        // Write stdin on a scoped thread while draining stdout/stderr so large inputs, such as
-        // NUL-separated path lists, cannot deadlock against a child that writes before reading all input.
-        let (output, written) = std::thread::scope(|scope| {
-            let writer = scope.spawn(move || stdin.write_all(input));
-            let output = child.wait_with_output();
-            (output, writer.join())
-        });
-        let output = output.map_err(AppError::from)?;
-        let written = written.map_err(|_| AppError::operational("git input writer panicked"))?;
+        command.args(args);
+        let (output, written) = run_with_input(command, input)?;
         // Git's own failure is actionable; a broken pipe after it exited is only a consequence.
         if output.status.success() {
-            written.map_err(AppError::from)?;
+            written?;
         }
         Ok(output)
     }
@@ -424,6 +400,23 @@ impl Repository {
         let output = self.with_input(["update-ref", "--stdin"], input.as_bytes(), None)?;
         if output.status.success() { Ok(()) } else { Err(git_error(output)) }
     }
+}
+
+/// Runs `command` with `input` on stdin and returns its output plus the stdin write result.
+fn run_with_input(mut command: Command, input: &[u8]) -> Result<(Output, Result<()>)> {
+    command.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    let mut child = command.spawn().map_err(|error| AppError::operational(format!("cannot execute git: {error}")))?;
+    let mut stdin = child.stdin.take().expect("piped stdin");
+    // Write stdin on a scoped thread while draining stdout/stderr so large inputs, such as
+    // NUL-separated path lists, cannot deadlock against a child that writes before reading all input.
+    let (output, written) = std::thread::scope(|scope| {
+        let writer = scope.spawn(move || stdin.write_all(input));
+        let output = child.wait_with_output();
+        (output, writer.join())
+    });
+    let output = output.map_err(AppError::from)?;
+    let written = written.map_err(|_| AppError::operational("git input writer panicked"))?;
+    Ok((output, written.map_err(AppError::from)))
 }
 
 pub(crate) fn clear_repository_environment(command: &mut Command) {

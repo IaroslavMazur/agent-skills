@@ -1,8 +1,8 @@
 mod common;
 
-use std::{fs, process::Command};
+use std::fs;
 
-use common::{Harness, exit_code, stderr, stdout, write_executable};
+use common::{Harness, exit_code, git_binary, prepared_id, stderr, stdout, write_executable};
 
 const BASE: &str = "line 01\nline 02 original\nline 03\nline 04\nline 05\nline 06 original\nline 07\nline 08\nline 09\nline 10\nline 11 original\nline 12\nline 13\nline 14\n";
 const BASELINE: &str = "line 01\nline 02 stray\nline 03\nline 04\nline 05\nline 06 original\nline 07\nline 08\nline 09\nline 10\nline 11 original\nline 12\nline 13\nline 14\n";
@@ -746,10 +746,6 @@ fn show_discard_and_receipt_retention_keep_prepared_transactions() {
     assert!(stdout(&persistent_show).starts_with(&format!("PREPARED {persistent}\n")));
 }
 
-fn prepared_id(output: &str) -> String {
-    output.lines().find_map(|line| line.strip_prefix("PREPARED\t")).expect("PREPARED record").to_owned()
-}
-
 fn advance_head(harness: &Harness, contents: &str, message: &str) -> String {
     let blob = harness.git_input(["hash-object", "-w", "--stdin"], contents.as_bytes());
     let tree_input = format!("100644 blob {blob}\tintended.txt\n");
@@ -758,10 +754,4 @@ fn advance_head(harness: &Harness, contents: &str, message: &str) -> String {
     let commit = harness.git(["commit-tree", &tree, "-p", &parent, "-m", message]);
     harness.git(["update-ref", "HEAD", &commit, &parent]);
     commit
-}
-
-fn git_binary() -> std::path::PathBuf {
-    let output = Command::new("sh").args(["-c", "command -v git"]).output().unwrap();
-    assert!(output.status.success());
-    std::path::PathBuf::from(String::from_utf8(output.stdout).unwrap().trim())
 }

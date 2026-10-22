@@ -621,11 +621,9 @@ fn bounded_trailer(repository_root: &Path) -> Option<String> {
     let bytes = coord::bounded(repository_root, "trailer", 512, coord::TRAILER_TIMEOUT)?;
     let text = String::from_utf8(bytes).ok()?;
     let line = text.trim_end_matches(['\r', '\n']);
-    if line.is_empty() ||
-        line.len() > 256 ||
+    if line.len() > 256 ||
         line.chars().any(char::is_control) ||
         !line.starts_with("Agent-Session: ") ||
-        line.len() == "Agent-Session: ".len() ||
         line.trim() != line
     {
         return None;

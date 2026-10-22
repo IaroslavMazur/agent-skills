@@ -8,8 +8,6 @@ use std::{
 use std::os::unix::fs::PermissionsExt;
 
 use regex::Regex;
-#[cfg(test)]
-use tempfile::NamedTempFile;
 
 pub fn create_metadata(path: &Path, expected: bool) -> io::Result<()> {
     let contents = format!("policy:\n  allow_implicit_invocation: {expected}\n");
@@ -151,29 +149,12 @@ fn replacement_metadata(path: &Path) -> io::Result<fs::Metadata> {
 }
 
 #[cfg(test)]
-fn publish_staged(temporary: &Path, path: &Path, mode: WriteMode) -> io::Result<()> {
-    let file = fs::OpenOptions::new().read(true).write(true).open(temporary)?;
-    let temporary = NamedTempFile::from_parts(file, tempfile::TempPath::try_from_path(temporary)?);
-    match mode {
-        WriteMode::Create => match temporary.persist_noclobber(path) {
-            Ok(_) => Ok(()),
-            Err(error) => {
-                let source = error.error;
-                let _ = error.file.keep();
-                Err(source)
-            }
-        },
-        WriteMode::Replace => temporary.persist(path).map(|_| ()).map_err(|error| error.error),
-    }
-}
-
-#[cfg(test)]
 mod tests {
     use std::fs;
 
     use tempfile::tempdir;
 
-    use super::{WriteMode, publish_staged, replace_policy_value};
+    use super::{WriteMode, atomic_write, replace_policy_value};
 
     #[test]
     fn replacement_is_scoped_and_byte_preserving() {
@@ -186,17 +167,15 @@ mod tests {
     }
 
     #[test]
-    fn create_publish_never_replaces_an_existing_target() {
+    fn create_never_replaces_an_existing_target() {
         let directory = tempdir().unwrap();
-        let temporary = directory.path().join("staged");
         let target = directory.path().join("openai.yaml");
-        fs::write(&temporary, "new\n").unwrap();
         fs::write(&target, "existing\n").unwrap();
 
-        let error = publish_staged(&temporary, &target, WriteMode::Create).unwrap_err();
+        let error = atomic_write(&target, b"new\n", WriteMode::Create).unwrap_err();
 
         assert_eq!(error.kind(), std::io::ErrorKind::AlreadyExists);
         assert_eq!(fs::read_to_string(&target).unwrap(), "existing\n");
-        assert_eq!(fs::read_to_string(&temporary).unwrap(), "new\n");
+        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
     }
 }

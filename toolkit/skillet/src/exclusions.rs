@@ -70,7 +70,8 @@ pub(crate) const CLAUDE_AGENT_STATE_FILES: &[&str] = &["history.jsonl", "remote-
 
 pub(crate) const CODEX_AGENT_STATE_FILES: &[&str] = &["history.jsonl", "session_index.jsonl"];
 
-/// Codex file-name globs matched by suffix in [`agent_state_path`] rather than by an exact name.
+/// Codex file-name globs that [`agent_state_path`] matches instead of an exact name. Each glob has a leading `*`
+/// and an optional trailing `*`.
 pub(crate) const CODEX_AGENT_STATE_FILE_GLOBS: &[&str] = &["*.sqlite*", "*.bak"];
 
 pub(crate) fn directory_name_is_excluded(name: &OsStr) -> bool {
@@ -101,10 +102,13 @@ pub(crate) fn agent_state_path(path: &Path) -> bool {
         parts.iter().position(|part| *part == OsStr::new(".codex")).is_some_and(|index| index + 1 < parts.len());
     let file = parts.last().and_then(|part| part.to_str()).unwrap_or_default();
     in_codex &&
-        (file.ends_with(".sqlite") ||
-            file.ends_with(".sqlite-shm") ||
-            file.ends_with(".sqlite-wal") ||
-            file.ends_with(".bak"))
+        CODEX_AGENT_STATE_FILE_GLOBS.iter().any(|glob| {
+            let pattern = glob.strip_prefix('*').unwrap_or(glob);
+            match pattern.strip_suffix('*') {
+                Some(infix) => file.contains(infix),
+                None => file.ends_with(pattern),
+            }
+        })
 }
 
 /// Home-relative roots excluded from a broad scan: macOS-protected paths, always-ignored agent
@@ -142,6 +146,7 @@ mod tests {
             ".codex/sessions/rollout.jsonl",
             ".codex/session_index.jsonl",
             ".codex/state.sqlite-wal",
+            ".codex/state.sqlite-journal",
             ".codex/config.bak",
         ] {
             assert!(agent_state_path(Path::new(path)), "{path}");

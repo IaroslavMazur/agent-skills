@@ -15,7 +15,7 @@ platform-independent. Run validation locally with the workspace's nightly Rust t
 - Use the rolling nightly toolchain and lockfile declared in `toolkit/` for every Cargo build, test, and install.
 - Run the package from `toolkit/` with `cargo run -p ai-notify --locked -- ...`.
 - Prefer `cargo test -p ai-notify --locked` for focused verification and `just rust-check` for the aggregate Rust gate.
-- Do not run `just install-cli` for ordinary verification. It installs every workspace binary under `~/.local`.
+- Do not run `just install-cli` for ordinary verification. It installs every CLI supported on this OS under `~/.local`.
 
 ## Architecture and Invariants
 
