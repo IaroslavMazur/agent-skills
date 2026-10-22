@@ -158,7 +158,9 @@ class TranscriptMinerTests(unittest.TestCase):
         self.fixture.claude_session(former, "historical-claude", former, user="needle")
         self.fixture.history([{"sessionId": "historical-claude", "project": str(former), "display": "needle"}])
         self.fixture.codex_session(
-            "historical-guardian", former, user="needle",
+            "historical-guardian",
+            former,
+            user="needle",
             native_metadata={"source": {"subagent": {"other": "guardian"}}, "parent_thread_id": "historical-codex"},
         )
         former.rmdir()
@@ -179,7 +181,9 @@ class TranscriptMinerTests(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, r"miner failed \(2\):\ntranscript-miner: project does not exist:"):
             self.fixture.run([missing_current], [], historical_projects=[former])
         report = self.fixture.run([], [], historical_projects=[former])
-        self.assertEqual([project["path"] for project in report["projects"]], [str(Path.cwd().resolve()), str(former.resolve())])
+        self.assertEqual(
+            [project["path"] for project in report["projects"]], [str(Path.cwd().resolve()), str(former.resolve())]
+        )
         not_directory = self.fixture.projects / "former-file"
         not_directory.write_text("not a directory", encoding="utf-8")
         with self.assertRaisesRegex(AssertionError, "historical project is not a directory"):
@@ -188,10 +192,12 @@ class TranscriptMinerTests(unittest.TestCase):
     def test_guardians_are_excluded_before_copied_history_can_rank(self) -> None:
         project = self.fixture.project("alpha")
         guardian = self.fixture.codex_session(
-            "guardian", project,
+            "guardian",
+            project,
             native_metadata={
                 "source": {"subagent": {"other": "guardian"}},
-                "thread_source": "subagent", "parent_thread_id": "primary",
+                "thread_source": "subagent",
+                "parent_thread_id": "primary",
                 "subagent_history_start_ordinal": 40,
             },
             extra=[message_record("user", f"needle correction {index}") for index in range(100)],
@@ -246,8 +252,10 @@ class TranscriptMinerTests(unittest.TestCase):
 
         report = self.fixture.run([project], ["needle"])
         sessions = {Path(session["path"]).stem: session for session in report["candidate_sessions"]}
-        self.assertEqual({name: session["session_kind"] for name, session in sessions.items()},
-                         {"primary": "primary", "child": "subagent", "unknown": "unknown"})
+        self.assertEqual(
+            {name: session["session_kind"] for name, session in sessions.items()},
+            {"primary": "primary", "child": "subagent", "unknown": "unknown"},
+        )
         self.assertTrue(all(session["parent_session_id"] is None for session in sessions.values()))
 
     def test_content_mentions_never_assign_foreign_projects(self) -> None:
@@ -306,7 +314,9 @@ class TranscriptMinerTests(unittest.TestCase):
 
         report = self.fixture.run([project], ["needle"])
 
-        self.assertEqual([Path(session["path"]).stem for session in report["candidate_sessions"]], ["rollout-real-user"])
+        self.assertEqual(
+            [Path(session["path"]).stem for session in report["candidate_sessions"]], ["rollout-real-user"]
+        )
         self.assertEqual(report["candidate_sessions"][0]["signal_channels"]["eligible_user_messages"], 1)
 
     def test_keyword_hits_are_deduplicated_and_failures_cannot_qualify(self) -> None:
@@ -502,7 +512,9 @@ class TranscriptMinerTests(unittest.TestCase):
         os.utime(old_codex, (old_mtime, old_mtime))
         revived_dir = self.fixture.codex_home / "sessions" / "2020" / "02" / "02"
         self.fixture.codex_session("revived", project, user="needle revived recently", session_dir=revived_dir)
-        self.fixture.codex_session("flat", project, user="needle flat layout", session_dir=self.fixture.codex_home / "sessions")
+        self.fixture.codex_session(
+            "flat", project, user="needle flat layout", session_dir=self.fixture.codex_home / "sessions"
+        )
 
         self.fixture.claude_session(project, "recent-claude", project, user="needle recent claude")
         old_claude = self.fixture.claude_session(project, "old-claude", project, user="needle old claude")
@@ -597,6 +609,7 @@ class TranscriptMinerTests(unittest.TestCase):
         )
         self.fixture.codex_session("short-word", project, user="I retried the command while merging")
         self.fixture.codex_session("longer-word", project, user="please retrieve the file")
+        self.fixture.codex_session("derived-word", project, user="mining the data took a while")
 
         report = self.fixture.run([project], ["overwrite", "verify", "commit"])
         session = report["candidate_sessions"][0]
@@ -609,6 +622,9 @@ class TranscriptMinerTests(unittest.TestCase):
         report = self.fixture.run([project], ["retry", "merge"])
         self.assertEqual([Path(s["path"]).stem for s in report["candidate_sessions"]], ["rollout-short-word"])
         self.assertEqual(report["candidate_sessions"][0]["keyword_hits"], {"retry": 1, "merge": 1})
+
+        report = self.fixture.run([project], ["miner"])
+        self.assertEqual(report["candidate_sessions"], [])
 
     def test_keyword_free_pass_keeps_every_owned_session_and_ranks_by_signals(self) -> None:
         project = self.fixture.project("signals-only")
@@ -669,7 +685,6 @@ class TranscriptMinerTests(unittest.TestCase):
 
         session = report["candidate_sessions"][0]
         self.assertRegex(session["modified"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
-
 
     def test_codex_head_finds_metadata_after_noise_and_with_any_json_spacing(self) -> None:
         project = self.fixture.project("alpha")
@@ -755,8 +770,14 @@ class TranscriptMinerTests(unittest.TestCase):
         meta = json.dumps({"type": "session_meta", "payload": {"id": "bytes", "cwd": str(project)}})
         user = json.dumps(message_record("user", "needle"))
         path = self.fixture.codex_sessions / "rollout-bytes.jsonl"
-        path.write_bytes(b'{"type":"noise","text":"\xff\xfe"}\n' + b'{"type":"session_meta","x":"\xff"}\n'
-                         + meta.encode() + b"\n" + user.encode() + b"\n")
+        path.write_bytes(
+            b'{"type":"noise","text":"\xff\xfe"}\n'
+            + b'{"type":"session_meta","x":"\xff"}\n'
+            + meta.encode()
+            + b"\n"
+            + user.encode()
+            + b"\n"
+        )
 
         report = self.fixture.run([project], ["needle"])
 

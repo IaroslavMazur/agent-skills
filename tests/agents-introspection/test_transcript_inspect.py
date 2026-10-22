@@ -88,10 +88,13 @@ class TranscriptInspectTests(unittest.TestCase):
     def test_explicit_guardian_inspection_surfaces_lineage_and_redacts_body(self) -> None:
         path = self.root / "guardian.jsonl"
         metadata = session_meta("guardian", "/repo")
-        metadata["payload"].update({
-            "source": {"subagent": {"other": "guardian"}},
-            "thread_source": "subagent", "parent_thread_id": "parent-session",
-        })
+        metadata["payload"].update(
+            {
+                "source": {"subagent": {"other": "guardian"}},
+                "thread_source": "subagent",
+                "parent_thread_id": "parent-session",
+            }
+        )
         write_jsonl(path, [metadata, message_record("user", "copied history user@example.com")])
 
         digest = run_inspector([path])["files"][0]
@@ -128,8 +131,13 @@ class TranscriptInspectTests(unittest.TestCase):
         for marker, kind in ((True, "subagent"), (False, "primary"), (None, "unknown")):
             with self.subTest(marker=marker):
                 path = self.root / "claude.jsonl"
-                record = {"type": "user", "sessionId": "claude", "cwd": "/repo",
-                          "parentUuid": "message-id", "message": {"role": "user", "content": "hello"}}
+                record = {
+                    "type": "user",
+                    "sessionId": "claude",
+                    "cwd": "/repo",
+                    "parentUuid": "message-id",
+                    "message": {"role": "user", "content": "hello"},
+                }
                 if marker is not None:
                     record["isSidechain"] = marker
                 write_jsonl(path, [record])
