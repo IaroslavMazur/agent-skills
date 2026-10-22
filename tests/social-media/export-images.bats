@@ -59,3 +59,13 @@ setup() {
   [ "${#lines[@]}" -eq 1 ]
   [ -f "$BATS_TEST_TMPDIR/still/10x10.jpg" ]
 }
+
+@test "a failing preset exits nonzero with the decoder error visible" {
+  magick -size 400x300 plasma:fractal "$BATS_TEST_TMPDIR/big.png"
+  head -c 2000 "$BATS_TEST_TMPDIR/big.png" > "$BATS_TEST_TMPDIR/truncated.png"
+  run /bin/bash "$exporter" "$BATS_TEST_TMPDIR/truncated.png" "$BATS_TEST_TMPDIR/broken" og 100x100
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'truncated.png'* ]]
+  [ "${#lines[@]}" -ge 1 ]
+  [[ "$output" != *'og.jpg '* ]]
+}
