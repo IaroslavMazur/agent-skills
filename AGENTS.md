@@ -91,9 +91,10 @@ obvious:
 - After editing Markdown, run `just prettier-write <changed files>` then `just prettier-check <changed files>`, in that
   order. If `prettier-check` fails, fix only the files you changed.
 - After editing Python, run `just python-fix <changed files>` then `just python-check <changed files>`, in that order.
-  Both wrap ruff, configured in `ruff.toml` at 120 columns. `python-check` lints and checks formatting. `python-fix`
-  applies safe lint fixes and formats. Fix the remaining findings by hand or narrow the code, and use an inline
-  suppression only for a one-off with a reason. Without paths, both recipes cover `skills` and `tests`.
+  Both run ruff through `uvx`, so no global install is needed, and `ruff.toml` is the only configuration. Without paths,
+  they cover every Python file in the repository. Fix remaining findings by hand or narrow the code. For a known false
+  positive, add the narrowest `per-file-ignores` entry in `ruff.toml` with a comment. Use an inline suppression only for
+  a one-off, with a reason.
 - The root `package.json` exists only for local formatting, type-checking, and hook wiring. There is no build step.
 - CLI changes go live only via `just toolkit::install-cli`, under the install-authorization rules in
   `toolkit/AGENTS.md`.

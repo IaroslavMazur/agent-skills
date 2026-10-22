@@ -11,6 +11,7 @@ mod toolkit
 # ---------------------------------------------------------------------------- #
 
 prettier := "bunx --no-install prettier"
+ruff := "uvx ruff@0.17.1"
 prettier_cache := ".cache/prettier/.prettier-cache"
 prettier_globs := "\"**/*.{md,json,jsonc,yaml,yml}\""
 evm_atlas_generator := "scripts/generate-evm-atlas.ts"
@@ -79,17 +80,17 @@ alias pw := prettier-write
 @pre-commit:
     sh .husky/pre-commit
 
-# Lint and check formatting of Python helpers and tests with ruff; pass paths to scope
+# Lint and check formatting of Python files; pass paths to scope
 [group("checks")]
-[positional-arguments]
 @python-check *paths:
-    if [ "$#" -eq 0 ]; then ruff check skills tests && ruff format --check skills tests; else ruff check "$@" && ruff format --check "$@"; fi
+    {{ ruff }} check {{ paths }}
+    {{ ruff }} format --check {{ paths }}
 
-# Apply safe ruff fixes and format Python helpers and tests; pass paths to scope
+# Apply safe lint fixes and format Python files; pass paths to scope
 [group("checks")]
-[positional-arguments]
 @python-fix *paths:
-    if [ "$#" -eq 0 ]; then ruff check --fix skills tests && ruff format skills tests; else ruff check --fix "$@" && ruff format "$@"; fi
+    {{ ruff }} check --fix {{ paths }}
+    {{ ruff }} format {{ paths }}
 
 # Run every Python test script
 [group("checks")]
@@ -113,9 +114,9 @@ alias pw := prettier-write
 @shell-check *paths:
     if [ "$#" -eq 0 ]; then shellcheck mcp/*.sh skills/*/scripts/*.sh tests/*/*.sh tests/*/*.bats; else shellcheck "$@"; fi
 
-# Run every test suite, the TypeScript check, and the evm-atlas freshness check
+# Run every test suite, the Python and TypeScript checks, and the evm-atlas freshness check
 [group("checks")]
-@test: python-test shell-test bats-test publish-skills-test evm-atlas-test typescript-check evm-atlas-check
+@test: python-check python-test shell-test bats-test publish-skills-test evm-atlas-test typescript-check evm-atlas-check
 
 # Exercise the orchestration Codex runner and wave watcher
 [group("checks")]

@@ -1,2 +1,11 @@
 cache-dir = ".cache/ruff"
 line-length = 120
+target-version = "py312"
+
+[lint.per-file-ignores]
+# Rollback must run every restore step and collect each failure for the report, so it catches Exception on purpose.
+"skills/repo-rename/scripts/repo-rename.py" = ["BLE001"]
+
+[format]
+# Prettier owns Markdown. Keep ruff away from Python code blocks in references.
+exclude = ["*.md"]
