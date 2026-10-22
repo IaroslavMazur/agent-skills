@@ -14,7 +14,6 @@ import urllib.error
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-
 SCRIPT = Path(__file__).resolve().parents[2] / "skills/orchestration/scripts/select-model.py"
 SPEC = importlib.util.spec_from_file_location("select_model", SCRIPT)
 ROUTER = importlib.util.module_from_spec(SPEC)

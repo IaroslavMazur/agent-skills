@@ -7,7 +7,6 @@ import sys
 import tempfile
 import unittest
 
-
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "skills" / "todo-archive" / "scripts" / "archive_todo.py"
 SPEC = importlib.util.spec_from_file_location("archive_todo", SCRIPT_PATH)

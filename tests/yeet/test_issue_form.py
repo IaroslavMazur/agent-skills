@@ -7,17 +7,15 @@
 from __future__ import annotations
 
 import importlib.util
-import json
 import subprocess
 import sys
 import tempfile
 import unittest
 from argparse import Namespace
-from pathlib import Path
 from contextlib import redirect_stderr
 from io import StringIO
+from pathlib import Path
 from unittest.mock import patch
-
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SKILL_ROOT = REPO_ROOT / "skills" / "yeet"
@@ -295,9 +293,8 @@ body:
             {"schemaVersion": 1, "fields": [{"id": "x", "type": "input", "label": "X", "required": True}]},
         ]
         for form in bad_forms:
-            with self.subTest(form=form):
-                with self.assertRaises(MODULE.FormError):
-                    MODULE.render_form(form, {})
+            with self.subTest(form=form), self.assertRaises(MODULE.FormError):
+                MODULE.render_form(form, {})
 
     def test_null_form_metadata_renders_as_empty(self) -> None:
         form = {"schemaVersion": 1, "fields": [], "labels": None, "assignees": None, "projects": None}
@@ -310,13 +307,15 @@ body:
             answers_path = Path(directory) / "answers.json"
             form_path.write_text('{"schemaVersion": 1, "fields": [{}]}', encoding="utf-8")
             answers_path.write_text("{}", encoding="utf-8")
-            with patch.object(
-                sys,
-                "argv",
-                ["issue-form.py", "render", "--form", str(form_path), "--answers", str(answers_path)],
+            with (
+                patch.object(
+                    sys,
+                    "argv",
+                    ["issue-form.py", "render", "--form", str(form_path), "--answers", str(answers_path)],
+                ),
+                redirect_stderr(StringIO()),
             ):
-                with redirect_stderr(StringIO()):
-                    self.assertEqual(MODULE.main(), 64)
+                self.assertEqual(MODULE.main(), 64)
 
 
 if __name__ == "__main__":

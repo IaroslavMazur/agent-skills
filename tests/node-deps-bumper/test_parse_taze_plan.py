@@ -4,7 +4,6 @@ import importlib.util
 import unittest
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "skills" / "node-deps-bumper" / "scripts" / "parse-taze-plan.py"
 SPEC = importlib.util.spec_from_file_location("parse_taze_plan", SCRIPT)
