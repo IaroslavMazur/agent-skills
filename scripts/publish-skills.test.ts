@@ -135,6 +135,23 @@ test("planner detects target layout, symlink, deletion, and stale lock metadata"
   );
 });
 
+test("planner accepts the skills CLI SHA-256 folder hash fallback", () => {
+  const fixture = createFixture();
+  const lock = readLock(fixture);
+  // skills@1.7.0 computeSkillFolderHash output for the alpha fixture skill.
+  lock.skills.alpha = lockEntry(fixture, "alpha", {
+    skillFolderHash: "c9000b024f254c44c09681569da510500d6e5fa3e77b33772fe77e0c721356b9",
+  });
+  lock.skills.beta = lockEntry(fixture, "beta", { skillFolderHash: "0".repeat(64) });
+  writeLock(fixture, lock);
+
+  assert.equal(run(fixture, "check", "--skill", "alpha").status, 0);
+  const { json, result } = runJson(fixture, "plan", "--json");
+  assert.equal(result.status, 0, result.stderr);
+  assert(!json.drifts.some((drift) => drift.skill === "alpha"));
+  assert(hasDrift(json, "beta", "lock-skill-folder-hash"));
+});
+
 test("planner rejects invalid source and CLI lock metadata", () => {
   const invalidTarget = createFixture();
   const skillFile = path.join(invalidTarget.sourceRoot, "skills", "beta", "SKILL.md");

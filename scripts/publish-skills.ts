@@ -327,8 +327,20 @@ function inspectLockEntry(skill: SourceSkill, entry: unknown, drifts: Drift[]): 
     return;
   }
 
+  // The CLI records the GitHub tree SHA, or its SHA-256 folder hash when the GitHub tree API is unavailable.
+  const folderHash = entry.skillFolderHash;
+  if (folderHash !== skill.treeHash && folderHash !== skillFolderSha256(skill)) {
+    addDrift(
+      drifts,
+      skill.name,
+      "lock",
+      "lock-skill-folder-hash",
+      lockPath,
+      `skillFolderHash is ${JSON.stringify(folderHash ?? null)}, expected ${JSON.stringify(skill.treeHash)}`,
+    );
+  }
+
   const expected = {
-    skillFolderHash: skill.treeHash,
     skillPath: `skills/${skill.name}/SKILL.md`,
     source: repository,
     sourceType: "github",
@@ -586,6 +598,17 @@ function hashIndexedTree(root: string, tree: IndexedTree): Buffer {
   );
   const body = Buffer.concat(entries.flatMap((entry) => [Buffer.from(`${entry.mode} ${entry.name}\0`), entry.oid]));
   return hashGitObject("tree", body);
+}
+
+// Mirrors skills CLI computeSkillFolderHash: regular files only, localeCompare order, path then content.
+function skillFolderSha256(skill: SourceSkill): string {
+  const hash = createHash("sha256");
+  const files = [...skill.snapshot].filter(([, entry]) => entry.type === "file").map(([relativePath]) => relativePath);
+  for (const relativePath of files.sort((left, right) => left.localeCompare(right))) {
+    hash.update(relativePath);
+    hash.update(fs.readFileSync(path.join(skill.root, relativePath)));
+  }
+  return hash.digest("hex");
 }
 
 function hashGitObject(type: "blob" | "tree", body: Buffer): Buffer {
