@@ -41,7 +41,8 @@ pub struct MapArgs {
     #[arg(long, value_name = "PATH", conflicts_with = "portfolio_root")]
     pub root: Vec<PathBuf>,
 
-    /// Scan the Git repository containing PATH plus ~/.agents/skills and ~/.claude/skills.
+    /// Scan the Git repository containing PATH, including nested skill roots such as <dir>/.agents/skills, plus
+    /// ~/.agents/skills and ~/.claude/skills.
     #[arg(long, value_name = "PATH", conflicts_with = "root")]
     pub portfolio_root: Option<PathBuf>,
 

@@ -216,6 +216,62 @@ fn portfolio_resolves_git_root_and_adds_present_user_roots() {
     assert!(user_skills.iter().all(|skill| skill["kind"] == "install"));
 }
 
+fn nested_skill_repository() -> TempDir {
+    let repository = TempDir::new().unwrap();
+    assert!(ProcessCommand::new("git").args(["init", "-q"]).current_dir(repository.path()).status().unwrap().success());
+    common::write(repository.path().join(".agents/skills/root-skill/SKILL.md"), common::skill("root-skill", ""));
+    common::write(
+        repository.path().join("workspace/.agents/skills/nested-skill/SKILL.md"),
+        common::skill("nested-skill", ""),
+    );
+    common::write(
+        repository.path().join("workspace/node_modules/dep/.agents/skills/vendored-skill/SKILL.md"),
+        common::skill("vendored-skill", ""),
+    );
+    repository
+}
+
+#[test]
+fn portfolio_discovers_workspace_nested_skill_roots() {
+    let repository = nested_skill_repository();
+    let home = TempDir::new().unwrap();
+    let run = |extra: &[&str]| {
+        let output = common::ai_skillet()
+            .args(["map", "--portfolio-root", repository.path().to_str().unwrap(), "--format", "json"])
+            .args(extra)
+            .env("HOME", home.path())
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        (serde_json::from_slice::<Value>(&output.stdout).unwrap(), String::from_utf8_lossy(&output.stderr).into_owned())
+    };
+
+    let (report, _) = run(&[]);
+    let mut names: Vec<_> =
+        report["skills"].as_array().unwrap().iter().map(|skill| skill["name"].as_str().unwrap()).collect();
+    names.sort_unstable();
+    assert_eq!(names, ["nested-skill", "root-skill"]);
+
+    let (report, stderr) = run(&["--skill", "nested-skill"]);
+    assert!(!stderr.contains("no discovered skill"), "{stderr}");
+    let skills = report["skills"].as_array().unwrap();
+    assert_eq!(skills.len(), 1);
+    assert!(
+        skills[0]["exposure_path"].as_str().unwrap().ends_with("workspace/.agents/skills/nested-skill/SKILL.md"),
+        "{}",
+        skills[0]
+    );
+}
+
+#[test]
+fn plain_root_omits_workspace_nested_skill_roots() {
+    let repository = nested_skill_repository();
+    let report = json_map(&["map", "--root", repository.path().to_str().unwrap(), "--format", "json"]);
+    let names: Vec<_> =
+        report["skills"].as_array().unwrap().iter().map(|skill| skill["name"].as_str().unwrap()).collect();
+    assert_eq!(names, ["root-skill"]);
+}
+
 #[test]
 fn newline_paths_large_lines_and_repeated_output_are_supported() {
     let root = TempDir::new().unwrap();

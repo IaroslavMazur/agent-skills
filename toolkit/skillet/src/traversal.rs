@@ -26,19 +26,26 @@ pub struct RootRequest {
     pub path: PathBuf,
     pub mode: RootMode,
     pub include_catalog_sources: bool,
+    pub nested_skill_roots: bool,
 }
 
 impl RootRequest {
     pub fn explicit(path: impl Into<PathBuf>) -> Self {
-        Self { path: path.into(), mode: RootMode::Explicit, include_catalog_sources: true }
+        Self { path: path.into(), mode: RootMode::Explicit, include_catalog_sources: true, nested_skill_roots: false }
+    }
+
+    /// Also recognize `<dir>/.agents/skills/<name>` and `<dir>/.claude/skills/<name>` at any depth below the root.
+    pub fn with_nested_skill_roots(mut self) -> Self {
+        self.nested_skill_roots = true;
+        self
     }
 
     pub fn broad(path: impl Into<PathBuf>) -> Self {
-        Self { path: path.into(), mode: RootMode::Broad, include_catalog_sources: false }
+        Self { path: path.into(), mode: RootMode::Broad, include_catalog_sources: false, nested_skill_roots: false }
     }
 
     pub fn broad_including_catalog_sources(path: impl Into<PathBuf>) -> Self {
-        Self { path: path.into(), mode: RootMode::Broad, include_catalog_sources: true }
+        Self { path: path.into(), mode: RootMode::Broad, include_catalog_sources: true, nested_skill_roots: false }
     }
 }
 
@@ -48,6 +55,8 @@ pub struct ScanRoot {
     pub resolved_path: PathBuf,
     pub mode: RootMode,
     pub include_catalog_sources: bool,
+    #[serde(skip)]
+    pub nested_skill_roots: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
@@ -140,6 +149,7 @@ fn normalize_root(request: &RootRequest) -> Result<ScanRoot, Error> {
         resolved_path,
         mode: request.mode,
         include_catalog_sources: request.include_catalog_sources,
+        nested_skill_roots: request.nested_skill_roots,
     })
 }
 
@@ -170,7 +180,10 @@ fn discover_root(root: &ScanRoot, skills: &mut BTreeMap<PathBuf, SkillExposure>)
         .git_exclude(true)
         .follow_links(false)
         .sort_by_file_path(|left, right| left.cmp(right));
-    if root.mode == RootMode::Explicit {
+    if root.nested_skill_roots {
+        let scan_root = root.exposure_path.clone();
+        builder.filter_entry(move |entry| nested_entry_allowed(entry, &scan_root));
+    } else if root.mode == RootMode::Explicit {
         builder.max_depth(Some(4));
     } else {
         let scan_root = root.exposure_path.clone();
@@ -255,6 +268,14 @@ pub(crate) fn recognized_skill_file(root: &ScanRoot, path: &Path) -> bool {
     {
         return true;
     }
+    if root.nested_skill_roots &&
+        parts.len() >= 4 &&
+        parts[parts.len() - 1] == OsStr::new("SKILL.md") &&
+        parts[parts.len() - 3] == OsStr::new("skills") &&
+        matches!(parts[parts.len() - 4].to_str(), Some(".agents" | ".claude"))
+    {
+        return true;
+    }
     (parts.len() == 3 && parts[0] == OsStr::new("skills") && parts[2] == OsStr::new("SKILL.md")) ||
         (parts.len() == 4 &&
             matches!(parts[0].to_str(), Some(".agents" | ".claude" | ".codex")) &&
@@ -284,6 +305,13 @@ fn classify_scope(root: &ScanRoot, path: &Path) -> ExposureScope {
         }
     }
     if parts.iter().any(|part| *part == OsStr::new("skills")) { ExposureScope::Catalog } else { ExposureScope::Broad }
+}
+
+fn nested_entry_allowed(entry: &DirEntry, scan_root: &Path) -> bool {
+    let path = entry.path();
+    path == scan_root ||
+        (!directory_name_is_excluded(entry.file_name()) &&
+            !agent_state_path(path.strip_prefix(scan_root).unwrap_or(path)))
 }
 
 fn broad_entry_allowed(entry: &DirEntry, scan_root: &Path, excluded_roots: &[PathBuf]) -> bool {

@@ -76,7 +76,7 @@ fn resolve_portfolio(requested: &Path) -> Result<ResolvedRoots, Error> {
 
     let home = home_directory()?;
     let mut user_roots = Vec::new();
-    let mut requests = vec![RootRequest::explicit(&repository_root)];
+    let mut requests = vec![RootRequest::explicit(&repository_root).with_nested_skill_roots()];
     for (relative, client) in [(".agents/skills", "codex"), (".claude/skills", "claude-code")] {
         let path = home.join(relative);
         let present = match fs::metadata(&path) {
