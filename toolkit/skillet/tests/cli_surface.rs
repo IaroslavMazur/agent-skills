@@ -8,11 +8,11 @@ use predicates::prelude::*;
 
 #[test]
 fn version_reports_the_package_version() {
-    common::ai_skillet()
-        .arg("--version")
-        .assert()
-        .success()
-        .stdout(predicate::str::is_match(r"^ai-skillet 1\.0\.0\n$").unwrap());
+    common::ai_skillet().arg("--version").assert().success().stdout(predicate::eq(concat!(
+        "ai-skillet ",
+        env!("CARGO_PKG_VERSION"),
+        "\n"
+    )));
 }
 
 #[test]
