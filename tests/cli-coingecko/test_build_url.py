@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib.util
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -23,6 +25,15 @@ class BuildUrlTests(unittest.TestCase):
     def test_rejects_non_slug(self) -> None:
         with self.assertRaises(ValueError):
             MODULE.build_url("BTC/USD", "2025-01-01")
+
+    def test_cli_rejects_dates_without_neighbors_cleanly(self) -> None:
+        for raw_date in ("0001-01-01", "9999-12-31"):
+            with self.subTest(raw_date=raw_date):
+                result = subprocess.run(
+                    [sys.executable, str(SCRIPT), "bitcoin", raw_date], capture_output=True, text=True, check=False
+                )
+                self.assertEqual(result.returncode, 2)
+                self.assertNotIn("Traceback", result.stderr)
 
 
 if __name__ == "__main__":

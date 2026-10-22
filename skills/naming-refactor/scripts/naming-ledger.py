@@ -22,7 +22,10 @@ class LedgerError(ValueError):
 
 
 def git(root: Path, *args: str) -> bytes:
-    result = subprocess.run(["git", *args], cwd=root, capture_output=True)
+    try:
+        result = subprocess.run(["git", *args], cwd=root, capture_output=True)
+    except OSError as exc:
+        raise LedgerError(f"cannot run git: {exc}") from exc
     if result.returncode:
         message = result.stderr.decode(errors="replace").strip()
         raise LedgerError(message or f"git {' '.join(args)} failed")
@@ -115,7 +118,8 @@ def load(path: Path) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError) as exc:
         raise LedgerError(f"cannot read ledger: {exc}") from exc
     if (
-        payload.get("schemaVersion") != 1
+        not isinstance(payload, dict)
+        or payload.get("schemaVersion") != 1
         or not isinstance(payload.get("revision"), int)
         or not isinstance(payload.get("repoRoot"), str)
         or not isinstance(payload.get("files"), list)
@@ -301,6 +305,11 @@ def refresh_command(args: argparse.Namespace) -> dict[str, Any]:
         present = path_present(root, item["path"])
         if item["present"] != present:
             item["present"] = present
+            changed = True
+        if not present and item["status"] == "retained":
+            # A removed path can no longer justify its name; it must be re-accounted.
+            item["status"] = "pending"
+            item["reason"] = None
             changed = True
     next_revision = payload["revision"] + 1
     added_paths = sorted(current_paths - by_path.keys())

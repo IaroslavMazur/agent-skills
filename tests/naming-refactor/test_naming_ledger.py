@@ -348,6 +348,24 @@ class NamingLedgerTests(unittest.TestCase):
             )
             self.assertTrue(final["complete"])
 
+    def test_refresh_reopens_retained_paths_that_were_removed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = make_repo(root)
+            (repo / "a.py").write_text("a = 1\n")
+            git(repo, "add", "a.py")
+            git(repo, "commit", "-qm", "initial")
+            ledger = root / "ledger.json"
+            self.helper("init", "--root", str(repo), "--ledger", str(ledger))
+            retained = json.loads(self.helper("mark", "--ledger", str(ledger), "--status", "retained", "--path", "a.py").stdout)
+            self.assertTrue(retained["complete"])
+
+            (repo / "a.py").unlink()
+            refreshed = json.loads(self.helper("refresh", "--ledger", str(ledger)).stdout)
+            self.assertFalse(refreshed["complete"])
+            self.assertEqual(refreshed["counts"]["pending"], 1)
+            self.assertEqual(refreshed["revision"], retained["revision"] + 1)
+
 
 if __name__ == "__main__":
     unittest.main()

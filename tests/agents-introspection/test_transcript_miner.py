@@ -350,7 +350,10 @@ class TranscriptMinerTests(unittest.TestCase):
     def test_claude_history_finds_old_session_behind_newer_irrelevant_files(self) -> None:
         project = self.fixture.project("history")
         history = [{"project": str(project), "sessionId": "old", "display": "needle task"}]
-        self.fixture.claude_session(project, "old", project, user="needle task")
+        old = self.fixture.claude_session(project, "old", project, user="needle task")
+        tool_results = old.parent / old.stem / "tool-results"
+        tool_results.mkdir(parents=True)
+        (tool_results / "toolu_spilled.txt").write_text("spilled output", encoding="utf-8")
         for index in range(70):
             session_id = f"new-{index:02d}"
             self.fixture.claude_session(project, session_id, project, user="unrelated")
@@ -362,6 +365,7 @@ class TranscriptMinerTests(unittest.TestCase):
         claude_sessions = [session for session in report["candidate_sessions"] if session["source"] == "claude"]
         self.assertEqual([Path(session["path"]).stem for session in claude_sessions], ["old"])
         self.assertEqual(coverage_by_project(report)[project]["claude_scanned"], 71)
+        self.assertEqual(coverage_by_project(report)[project]["claude_tool_result_files"], 1)
 
     def test_conflicting_claude_ownership_is_ambiguous(self) -> None:
         project_a = self.fixture.project("claude-a")

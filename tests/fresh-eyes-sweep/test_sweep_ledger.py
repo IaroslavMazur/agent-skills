@@ -67,7 +67,7 @@ class SweepLedgerTests(unittest.TestCase):
             self.assertTrue(final["complete"])
             self.assertEqual(final["counts"]["fixed"], 1)
 
-    def test_atomic_mark_rejects_unknown_path_without_partial_change(self) -> None:
+    def test_unknown_scope_and_path_fail_without_partial_change(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             repo = root / "repo"
@@ -79,6 +79,10 @@ class SweepLedgerTests(unittest.TestCase):
             git(repo, "add", "a")
             git(repo, "commit", "-qm", "initial")
             ledger = root / "ledger.json"
+            missing_scope = self.helper("init", "--root", str(repo), "--ledger", str(ledger), "typo", check=False)
+            self.assertEqual(missing_scope.returncode, 64)
+            self.assertIn("typo", missing_scope.stderr)
+            self.assertFalse(ledger.exists())
             self.helper("init", "--root", str(repo), "--ledger", str(ledger))
             before = ledger.read_bytes()
             result = self.helper(

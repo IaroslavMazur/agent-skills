@@ -254,11 +254,11 @@ class TranscriptInspectTests(unittest.TestCase):
 
         self.assertTrue(all(entry["error"] for entry in report["files"]))
 
-    def test_max_entries_caps_output_and_reports_omitted_count(self) -> None:
+    def test_entry_count_and_text_length_are_capped(self) -> None:
         path = self.root / "session.jsonl"
         records = [session_meta("s1", "/repo")]
         for index in range(10):
-            records.append(message_record("user", f"user message {index}"))
+            records.append(message_record("user", f"user message {index} " + "word " * 100))
         write_jsonl(path, records)
 
         report = run_inspector([path], max_entries=3)
@@ -266,6 +266,8 @@ class TranscriptInspectTests(unittest.TestCase):
 
         self.assertEqual(len(file_digest["entries"]), 3)
         self.assertEqual(file_digest["omitted_entries"], 7)
+        self.assertTrue(all(len(entry["text"]) <= 240 for entry in file_digest["entries"]))
+        self.assertTrue(file_digest["entries"][0]["text"].endswith("..."))
 
     def test_text_format_smoke(self) -> None:
         path = self.root / "session.jsonl"

@@ -24,7 +24,7 @@ EOF
   chmod +x "$BUN_INSTALL/bin/chrome-devtools-mcp"
 }
 
-@test "attaches with privacy and screenshot options and default MP4 recording" {
+@test "attaches with privacy and screenshot options" {
   run /bin/bash "$wrapper"
 
   [ "$status" -eq 0 ]
