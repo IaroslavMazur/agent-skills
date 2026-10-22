@@ -43,6 +43,7 @@ fi
 
 printf '%s\n' "$@" >"$TAZE_LOG"
 printf '%s\n' "${TAZE_OUTPUT:-fixture - up to date}"
+exit "${TAZE_EXIT:-0}"
 EOF
   chmod 755 "$mock_bin/taze"
 }
@@ -275,4 +276,13 @@ EOF
   [ "$(sed -n '2p' "$uv_log")" = "$repo_root/skills/node-deps-bumper/scripts/parse-taze-plan.py" ]
   [ "$(sed -n '3p' "$uv_log")" = '--input' ]
   [ -n "$(sed -n '4p' "$uv_log")" ]
+}
+
+@test "plan mode reports taze failures instead of discarding captured output" {
+  write_package_json '{"name":"fixture"}'
+  run env TAZE_OUTPUT='fixture registry failure' TAZE_EXIT=3 "$helper" --plan "$project"
+
+  [ "$status" -eq 3 ]
+  [[ "$output" == *'fixture registry failure'* ]]
+  [ ! -e "$uv_log" ]
 }

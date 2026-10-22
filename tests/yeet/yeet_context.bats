@@ -258,7 +258,7 @@ list
 --repo
 acme/widgets
 --limit
-200
+1000
 --json
 name,description
 EOF

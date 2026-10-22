@@ -369,7 +369,7 @@ def _validate_render_form(form: Any) -> list[dict[str, Any]]:
         value = form.get(name)
         if value is not None and (not isinstance(value, list) or not all(isinstance(item, str) for item in value)):
             raise FormError(f"form {name} must be a string array")
-    invalid_projects = [project for project in form.get("projects", []) if not PROJECT_RE.fullmatch(project)]
+    invalid_projects = [project for project in form.get("projects") or [] if not PROJECT_RE.fullmatch(project)]
     if invalid_projects:
         raise FormError(f"form projects must use OWNER/NUMBER: {', '.join(invalid_projects)}")
     return fields

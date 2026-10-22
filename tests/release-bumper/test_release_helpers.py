@@ -119,6 +119,17 @@ class PlannerTests(unittest.TestCase):
             self.assertNotIn("excludedFiles", payload)
             self.assertFalse(payload["changeHints"]["authoritative"])
 
+            git(repo, "tag", "v1.0.1-rc-1")
+            result = subprocess.run(
+                ["bun", "run", str(PLANNER), "--cwd", str(repo), "--version", "1.0.1-rc-2"],
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["errors"], [])
+            self.assertEqual(payload["previousTags"]["demo"]["tag"], "v1.0.1-rc-1")
+
 
 class FinalizerTests(unittest.TestCase):
     def test_explicit_beta_and_promotion_transitions(self) -> None:
@@ -147,8 +158,10 @@ class FinalizerTests(unittest.TestCase):
         self.assertIsNone(by_range[">=1 <2"]["satisfied"])
         self.assertEqual(by_range["workspace:^1.2.3"]["suggestedRange"], "workspace:^2.0.0")
         self.assertFalse(finalizer.satisfies("2.0.0-beta.1", "^2.0.0"))
+        self.assertIn({"package": "b", "decision": "choose dependent release version"}, result["unresolvedDecisions"])
         cascaded = finalizer.finalize(payload, ["a=2.0.0", "b=2.0.1"])
         self.assertEqual(cascaded["versions"]["b"]["planned"], "2.0.1")
+        self.assertEqual(cascaded["unresolvedDecisions"], [])
 
     def test_cycles_are_reported_without_failing(self) -> None:
         payload = discovery()

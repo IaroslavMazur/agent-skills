@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import importlib.util
 import json
 import os
@@ -173,6 +174,31 @@ class RepoRenameTests(unittest.TestCase):
         self.assertFalse(destination.parent.parent.exists())
         status = subprocess.run(["git", "status", "--porcelain"], cwd=self.repo, text=True, capture_output=True, check=True)
         self.assertEqual(status.stdout, "")
+
+    def test_claude_move_failure_restores_files_in_place(self) -> None:
+        subprocess.run(["git", "remote", "remove", "origin"], cwd=self.repo, check=True)
+        old_path = str(self.repo.resolve())
+        claude = Path(self.env["HOME"]) / ".claude" / "projects"
+        project = claude / re.sub(r"[^A-Za-z0-9]", "-", old_path)
+        project.mkdir(parents=True)
+        (project / "session.jsonl").write_text(json.dumps({"cwd": old_path}), encoding="utf-8")
+        with patch.dict(os.environ, self.env, clear=True), contextlib.chdir(self.repo):
+            plan = HELPER.preflight("new-repo")
+        real_rename = Path.rename
+
+        def fail_claude_move(path: Path, target: Path) -> Path:
+            if path == plan["old_claude"]:
+                raise OSError("injected Claude move failure")
+            return real_rename(path, target)
+
+        with (
+            patch.object(HELPER.Path, "rename", fail_claude_move),
+            self.assertRaisesRegex(HELPER.RenameError, "rollback completed"),
+        ):
+            HELPER.apply(plan)
+        self.assertTrue(self.repo.exists())
+        self.assertEqual(json.loads((project / "session.jsonl").read_text())["cwd"], old_path)
+        self.assertFalse(plan["new_claude"].exists())
 
     def test_default_preview_excludes_ignored_native_build_output(self) -> None:
         ignored = self.repo / "apps" / "mobile" / "ios" / "Pods" / "config.txt"

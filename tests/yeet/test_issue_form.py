@@ -297,6 +297,11 @@ body:
                 with self.assertRaises(MODULE.FormError):
                     MODULE.render_form(form, {})
 
+    def test_null_form_metadata_renders_as_empty(self) -> None:
+        form = {"schemaVersion": 1, "fields": [], "labels": None, "assignees": None, "projects": None}
+        posting = MODULE.render_form(form, {})["posting"]
+        self.assertEqual((posting["labels"], posting["assignees"], posting["projects"]), ([], [], []))
+
     def test_cli_maps_malformed_render_form_to_exit_64(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             form_path = Path(directory) / "form.json"

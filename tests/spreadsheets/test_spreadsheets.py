@@ -72,7 +72,6 @@ def test_profile(tmp: Path) -> None:
     assert payload["formula_prefix_cells"]["count"] == 2
     assert payload["formula_prefix_cells"]["first"][0]["value"] == "<redacted>"
     assert "recommendations" not in payload
-    assert payload["stats"]["available"] in (True, False)
 
     _, external = run_json([sys.executable, str(PROFILE), str(risky), "--external-data"])
     assert external["status"] == "issues_found"

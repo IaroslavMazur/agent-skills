@@ -136,6 +136,19 @@ def test_profile(tmp: Path) -> tuple[Path, Path]:
     assert result.returncode == 1
     assert corrupt_payload["status"] == "error"
     assert corrupt_payload["error"]["code"] == "unreadable_pdf"
+
+    owner_only = tmp / "owner-only.pdf"
+    run(["qpdf", "--encrypt", "", "owner", "256", "--", str(digital), str(owner_only)])
+    _, owner_payload = run_json([sys.executable, str(PROFILE), str(owner_only)])
+    assert owner_payload["status"] == "ok"
+    assert owner_payload["encrypted"] is True
+    assert owner_payload["text"]["pages_with_text"] == [1, 2]
+
+    user_locked = tmp / "user-locked.pdf"
+    run(["qpdf", "--encrypt", "user", "owner", "256", "--", str(digital), str(user_locked)])
+    result, locked_payload = run_json([sys.executable, str(PROFILE), str(user_locked)], check=False)
+    assert result.returncode == 1
+    assert locked_payload["status"] == "password_required"
     return digital, scan
 
 

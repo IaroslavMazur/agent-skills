@@ -86,6 +86,10 @@ if [[ "${1:-}" == "exec" && "${2:-}" == "--help" ]]; then
   exit 0
 fi
 
+if [[ -n "${FAKE_ENV_FILE:-}" ]]; then
+  printf '%s\n' "${AI_COORD_CLIENT:-}/${AI_COORD_SESSION_ID:-}" >"$FAKE_ENV_FILE"
+fi
+
 : >"$FAKE_ARGS_FILE"
 for arg in "$@"; do
   printf '%s\n' "$arg" >>"$FAKE_ARGS_FILE"
@@ -227,6 +231,22 @@ model_line="$(grep -nFx -- '-m' "$args_file" | cut -d: -f1)"
 )
 assert_arg thread-name
 
+# --coord-identity runs Codex under the parent's ai-coord session identity.
+env_file="$tmp_dir/coord-env"
+(
+  cd "$repo"
+  printf '%s\n' 'approved implementation' | PATH="$fake_path" FAKE_ENV_FILE="$env_file" "$runner" \
+    --model gpt-6.1-sol --effort high --timeout-seconds 5 --coord-identity claude/session-1 >/dev/null
+)
+[[ "$(cat "$env_file")" == 'claude/session-1' ]] || fail "--coord-identity was not exported to Codex"
+(
+  cd "$repo"
+  printf '%s\n' 'approved implementation' | PATH="$fake_path" FAKE_ENV_FILE="$env_file" \
+    AI_COORD_CLIENT=codex AI_COORD_SESSION_ID=inherited "$runner" \
+    --model gpt-6.1-sol --effort high --timeout-seconds 5 >/dev/null
+)
+[[ "$(cat "$env_file")" == 'codex/inherited' ]] || fail "runner changed the identity without --coord-identity"
+
 # Read-only research mode uses the sandbox and research schema.
 readonly_result="$(
   cd "$repo"
@@ -269,6 +289,12 @@ exec_line="$(grep -nFx -- 'exec' "$args_file" | cut -d: -f1)"
     "$runner" --model gpt-6.1-sol --effort high --timeout-seconds 0
   expect_failure 64 'session ID must be non-empty' env PATH="$fake_path" \
     "$runner" --model gpt-6.1-sol --effort high --timeout-seconds 5 --resume=
+  expect_failure 64 'must be CLIENT/SESSION_ID' env PATH="$fake_path" \
+    "$runner" --model gpt-6.1-sol --effort high --timeout-seconds 5 --coord-identity claude
+  expect_failure 64 'client must be claude or codex' env PATH="$fake_path" \
+    "$runner" --model gpt-6.1-sol --effort high --timeout-seconds 5 --coord-identity other/session-1
+  expect_failure 64 'session ID must be non-empty' env PATH="$fake_path" \
+    "$runner" --model gpt-6.1-sol --effort high --timeout-seconds 5 --coord-identity claude/
   expect_failure 69 'not authenticated' env PATH="$fake_path" FAKE_AUTH_FAIL=1 \
     "$runner" --model gpt-6.1-sol --effort high --timeout-seconds 5
   expect_failure 69 'lacks --dangerously-bypass-approvals-and-sandbox' env PATH="$fake_path" \
