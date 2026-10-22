@@ -350,9 +350,14 @@ const fn scope_kind_order(kind: ScopeKind) -> u8 {
 }
 
 pub(crate) fn scope_covers(covering: &Scope, covered: &Scope) -> bool {
-    covering.path == covered.path ||
-        (covering.is_recursive() &&
-            (covering.path == "." || covered.path.starts_with(&format!("{}/", covering.path))))
+    if covering.is_recursive() {
+        covering.path == "." ||
+            covering.path == covered.path ||
+            covered.path.starts_with(&format!("{}/", covering.path))
+    } else {
+        // An exact leaf never covers the subtree of a recursive scope with the same path.
+        !covered.is_recursive() && covering.path == covered.path
+    }
 }
 
 pub(crate) fn scopes_cover(covering: &[Scope], covered: &[Scope]) -> bool {
@@ -376,7 +381,8 @@ pub(crate) fn overlapping_paths(left: &[Scope], right: &[Scope]) -> Vec<String> 
             if !scopes_overlap(a, b) {
                 continue;
             }
-            let value = if a.path.len() >= b.path.len() { &a.path } else { &b.path };
+            // The intersection is the inner scope; path length misjudges a root `.` scope.
+            let value = if scope_covers(a, b) { &b.path } else { &a.path };
             if !values.contains(value) {
                 values.push(value.clone());
             }
@@ -773,8 +779,12 @@ mod tests {
         let recursive_dir = scope("src", true);
         assert!(!scopes_overlap(&exact_dir, &child));
         assert!(scopes_overlap(&recursive_dir, &child));
-        assert!(scopes_cover(&[recursive_dir], &[child]));
-        assert!(!scopes_cover(&[exact_dir], &[scope("src/lib.rs", false)]));
+        assert!(scope_covers(&recursive_dir, &child));
+        assert!(!scope_covers(&exact_dir, &child));
+        assert!(scope_covers(&recursive_dir, &exact_dir));
+        assert!(!scope_covers(&exact_dir, &recursive_dir));
+        assert_eq!(overlapping_paths(&[scope(".", true)], &[scope("a", false)]), ["a"]);
+        assert_eq!(overlapping_paths(&[scope("a", false)], &[scope(".", true)]), ["a"]);
     }
 
     #[test]

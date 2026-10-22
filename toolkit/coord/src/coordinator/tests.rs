@@ -1320,6 +1320,27 @@ fn concurrent_dead_session_probes_notify_each_waiter_once() {
 }
 
 #[test]
+fn converting_an_active_exact_scope_to_recursive_is_an_arbitrated_expansion() {
+    let owner = identity("owner");
+    let peer = identity("peer");
+    let (_temp, roots, coordinator) = fixture(1, &[(&owner, 0, 100), (&peer, 0, 101)]);
+    let planned = [PathBuf::from("planned")];
+    assert_eq!(
+        coordinator.start_for(owner.clone(), "owner", &planned, &[], &roots[0]).unwrap().kind,
+        OutcomeKind::Ready
+    );
+    let child = [PathBuf::from("planned/child.rs")];
+    assert_eq!(coordinator.start_for(peer, "peer", &child, &[], &roots[0]).unwrap().kind, OutcomeKind::Ready);
+
+    let outcome = coordinator.start_for(owner.clone(), "owner", &[], &planned, &roots[0]).unwrap();
+
+    assert_eq!(outcome.kind, OutcomeKind::Active);
+    assert!(outcome.detail.starts_with("update-blocked:"), "{}", outcome.detail);
+    let work = coordinator.store().unwrap().work(&owner).unwrap().unwrap();
+    assert_eq!(work.claims[0].scopes, [Scope { path: "planned".to_owned(), kind: ScopeKind::Exact }]);
+}
+
+#[test]
 fn idle_holder_yields_the_untouched_overlapping_scope_and_keeps_the_rest() {
     let holder = identity("holder");
     let requester = identity("requester");
@@ -1544,7 +1565,6 @@ fn authoritative_inventory_does_not_reset_an_idle_claude_holders_yield_clock() {
         state: SessionState::Idle,
         name: None,
         waiting_for: None,
-        pid: Some(220),
         fingerprint: Some(ProcessFingerprint { pid: 220, start_token: Some("token-220".to_owned()) }),
         started_at: 1.0,
     };

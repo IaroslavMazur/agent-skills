@@ -139,7 +139,6 @@ pub(crate) struct ClaudeSessionObservation {
     pub(crate) state: SessionState,
     pub(crate) name: Option<String>,
     pub(crate) waiting_for: Option<String>,
-    pub(crate) pid: Option<u32>,
     pub(crate) fingerprint: Option<ProcessFingerprint>,
     pub(crate) started_at: f64,
 }
@@ -292,7 +291,6 @@ pub(crate) fn normalize_claude_sessions(payload: &Value, probe: &dyn ProcessProb
             },
             name: raw.get("name").and_then(Value::as_str).map(str::to_owned),
             waiting_for: raw.get("waitingFor").and_then(Value::as_str).map(str::to_owned),
-            pid,
             fingerprint,
             started_at,
         });
@@ -615,7 +613,6 @@ mod tests {
         ]);
         let normalized = normalize_claude_sessions(&payload, &DeniedProbe);
         assert_eq!(normalized.dropped, 0);
-        assert_eq!(normalized.sessions[0].pid, Some(42));
         assert_eq!(normalized.sessions[0].fingerprint, None);
     }
 }

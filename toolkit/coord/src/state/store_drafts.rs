@@ -126,7 +126,7 @@ fn save_draft(
         }
     }
     bump_generation(transaction)?;
-    draft_from_id(transaction, draft_id)?.ok_or_else(|| AppError::retry("draft disappeared during replacement"))
+    draft_by_id_from(transaction, draft_id)?.ok_or_else(|| AppError::retry("draft disappeared during replacement"))
 }
 
 pub(super) fn delete_draft(transaction: &Transaction<'_>, id: i64) -> Result<bool> {
@@ -193,10 +193,6 @@ fn finish_draft(connection: &Connection, base: DraftBase) -> Result<DraftRow> {
         updated_at: base.updated_at,
         claims,
     })
-}
-
-fn draft_from_id(connection: &Connection, id: i64) -> Result<Option<DraftRow>> {
-    draft_by_id_from(connection, id)
 }
 
 pub(super) fn draft_by_id_from(connection: &Connection, id: i64) -> Result<Option<DraftRow>> {

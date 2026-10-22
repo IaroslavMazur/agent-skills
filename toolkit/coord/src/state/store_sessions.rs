@@ -400,7 +400,8 @@ pub(super) fn session_from_row(row: &Row<'_>) -> rusqlite::Result<SessionRow> {
     })
 }
 
-fn callsign_key(callsign: &str) -> String {
+/// Uniqueness and lookup key: collapsed whitespace, NFC, full case folding, no emoji variation selectors.
+pub(crate) fn callsign_key(callsign: &str) -> String {
     let whitespace_collapsed = callsign.split_whitespace().collect::<Vec<_>>().join(" ");
     whitespace_collapsed
         .nfc()

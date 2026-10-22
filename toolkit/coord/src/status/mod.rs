@@ -33,7 +33,7 @@ fn render_status_at(snapshot: &SnapshotV2, now: f64) -> String {
             named.extend(work.into_iter().map(|work| (session, Some(work))));
             continue;
         }
-        if machine_wide || is_named(session, None) {
+        if machine_wide || is_named(session) {
             named.push((session, None));
             continue;
         }
@@ -80,7 +80,6 @@ fn render_status_at(snapshot: &SnapshotV2, now: f64) -> String {
         )
     });
     if finding_counts != (0, 0, 0) {
-        let machine_wide = snapshot.scope.kind == SnapshotScopeKindV2::Machine;
         let scope = if machine_wide { "machine-wide" } else { snapshot.scope.repo_root.as_deref().unwrap_or("") };
         lines.push(format!(
             "Findings ({}): pending={}; triaging={}; handed-off={}. `ai-coord finding list` shows details.",
@@ -127,10 +126,9 @@ struct AnonymousGroup<'a> {
     rows: Vec<&'a SnapshotSessionV2>,
 }
 
-fn is_named(session: &SnapshotSessionV2, work: Option<&SnapshotWorkV2>) -> bool {
+fn is_named(session: &SnapshotSessionV2) -> bool {
     session.callsign.is_some() ||
         session.name.is_some() ||
-        work.is_some() ||
         session.permission_mode.as_deref() == Some("plan") ||
         session.coordination_waived ||
         session.delegate_count.unwrap_or_default() > 0
@@ -264,7 +262,7 @@ fn state_name(state: SessionState) -> &'static str {
     }
 }
 
-fn age_label(timestamp: f64, now: f64) -> String {
+pub(crate) fn age_label(timestamp: f64, now: f64) -> String {
     let seconds = (now - timestamp).max(0.0) as u64;
     if seconds < 60 {
         format!("{seconds}s")
@@ -277,7 +275,7 @@ fn age_label(timestamp: f64, now: f64) -> String {
     }
 }
 
-fn unix_now() -> f64 {
+pub(crate) fn unix_now() -> f64 {
     SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs_f64()
 }
 

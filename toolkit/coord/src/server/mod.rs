@@ -525,10 +525,10 @@ mod tests {
 
     #[tokio::test]
     async fn sweep_shared_poller_polls_once_per_tick_regardless_of_subscriber_count() {
-        // Two independently-polling SSE clients (the pre-fix behavior) would
-        // read `generation()` roughly twice as often as one. The shared
-        // poller performs exactly one source poll per tick no matter how
-        // many subscribers are attached, so the counts below should match.
+        // Independently polling SSE clients would read `generation()` roughly
+        // twice as often with two subscribers as with one. The shared poller
+        // performs exactly one source poll per tick no matter how many
+        // subscribers are attached, so the counts below should match.
         async fn generation_reads_with(subscribers: usize) -> usize {
             let service = Arc::new(SnapshotService::new(Source::new(1)));
             let receivers: Vec<_> = (0..subscribers).map(|_| service.subscribe_poll()).collect();

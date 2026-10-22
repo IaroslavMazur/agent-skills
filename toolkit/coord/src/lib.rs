@@ -15,7 +15,6 @@ use std::{
     io::{self, Read},
     path::{Component, Path, PathBuf},
     process::ExitCode,
-    time::{SystemTime, UNIX_EPOCH},
 };
 
 use clap::Parser;
@@ -31,7 +30,7 @@ use crate::{
     error::{AppError, ErrorKind, Result},
     hooks::{
         config::{ConfigError, default_hook_path, inspect_hooks, link_default_hooks},
-        runtime::HookRuntime,
+        runtime::{HookRuntime, noop_stdout},
         specs::Client as HookConfigClient,
         trust::{TrustOutcome, inspect_codex_hook_trust, trust_codex_hooks},
     },
@@ -252,7 +251,13 @@ async fn execute(cli: Cli) -> Result<u8> {
                 let sender = row.sender_callsign.unwrap_or_else(|| {
                     format!("{}/{}", client_name(row.sender.client), short_id(&row.sender.session_id))
                 });
-                println!("{}\t{}\t{}\t{}", row.id, age_label(row.created_at), sender, row.text);
+                println!(
+                    "{}\t{}\t{}\t{}",
+                    row.id,
+                    status::age_label(row.created_at, status::unix_now()),
+                    sender,
+                    row.text
+                );
             }
             if let Some(hint) = recommendations::inbox_hint(&coordinator)? {
                 eprintln!("{hint}");
@@ -583,7 +588,7 @@ fn run_hook(client: HookClient) {
     };
     let output = match Coordinator::open_default() {
         Ok(coordinator) => HookRuntime::new(&coordinator).ingest(client, &payload),
-        Err(_) => noop_hook_output(client, hook_event(&payload)).to_owned(),
+        Err(_) => noop_stdout(client, hook_event(&payload)),
     };
     if !output.is_empty() {
         println!("{output}");
@@ -617,10 +622,6 @@ fn read_hook_payload() -> Option<Value> {
 
 fn hook_event(payload: &Value) -> &str {
     payload.get("hook_event_name").and_then(Value::as_str).unwrap_or("unknown")
-}
-
-fn noop_hook_output(client: &str, event: &str) -> &'static str {
-    if client == "codex" && matches!(event, "Stop" | "SubagentStop") { "{}" } else { "" }
 }
 
 fn hook_client_name(client: HookClient) -> &'static str {
@@ -862,20 +863,6 @@ fn hook_config_client_name(client: HookConfigClient) -> &'static str {
 fn short_id(value: &str) -> &str {
     let end = value.char_indices().nth(8).map_or(value.len(), |(index, _)| index);
     &value[..end]
-}
-
-fn age_label(timestamp: f64) -> String {
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs_f64();
-    let seconds = (now - timestamp).max(0.0) as u64;
-    if seconds < 60 {
-        format!("{seconds}s")
-    } else if seconds < 3_600 {
-        format!("{}m", seconds / 60)
-    } else if seconds < 86_400 {
-        format!("{}h", seconds / 3_600)
-    } else {
-        format!("{}d", seconds / 86_400)
-    }
 }
 
 #[cfg(test)]

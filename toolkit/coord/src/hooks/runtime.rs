@@ -675,7 +675,7 @@ fn collect_touched(value: &Value, paths: &mut Vec<String>) {
     }
 }
 
-fn noop_stdout(client: &str, event: &str) -> String {
+pub(crate) fn noop_stdout(client: &str, event: &str) -> String {
     if client == "codex" && matches!(event, "Stop" | "SubagentStop") { "{}".to_owned() } else { String::new() }
 }
 fn contains_exact_id(message: &str, id: &str) -> bool {

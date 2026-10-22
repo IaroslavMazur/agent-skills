@@ -20,7 +20,6 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-use unicode_casefold::UnicodeCaseFold;
 use unicode_normalization::UnicodeNormalization;
 
 use crate::{
@@ -35,7 +34,7 @@ use crate::{
         git_blob_hashes, git_dirty_paths, git_root, host_process_reference, identity_key, process_ancestors,
     },
     server::{SnapshotMessageV1, SnapshotSource},
-    state::{DraftRow, MessageRow, ProviderCacheRow, SessionRow, SessionUpdate, Store, WorkRow},
+    state::{DraftRow, MessageRow, ProviderCacheRow, SessionRow, SessionUpdate, Store, WorkRow, callsign_key},
 };
 
 pub(crate) use inventory::{HostInventory, ProviderInventory};
@@ -673,16 +672,6 @@ pub(crate) fn normalize_callsign(text: &str) -> Result<String> {
         return Err(AppError::usage("callsign must contain at least one emoji"));
     }
     Ok(value)
-}
-fn callsign_key(text: &str) -> String {
-    text.split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .nfc()
-        .case_fold()
-        .nfc()
-        .filter(|value| !matches!(value, '\u{fe0e}' | '\u{fe0f}'))
-        .collect()
 }
 fn path_text(path: &Path) -> Result<String> {
     path.to_str().map(str::to_owned).ok_or_else(|| AppError::usage("path is not valid UTF-8"))

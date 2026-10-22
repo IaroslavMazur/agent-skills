@@ -16,6 +16,7 @@ pub(crate) use schema::SCHEMA_VERSION;
 pub(crate) use store::MAX_INBOX_MESSAGES;
 pub(crate) use store::Store;
 pub(crate) use store_recommendations::{MAX_RECOMMENDATION_SCOPES, MAX_RECOMMENDATION_TEXT};
+pub(crate) use store_sessions::callsign_key;
 pub(crate) use store_triage::TriageRun;
 pub(crate) use store_work::WorkTransaction;
 
