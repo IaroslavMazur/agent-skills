@@ -34,7 +34,7 @@ from transcript_common import (
     first_string_shallow,
     format_utc_iso,
     is_within,
-    keyword_match_terms,
+    keyword_matcher,
     keywords_present_in_lines,
     normalize_path,
     parse_utc_timestamp,
@@ -769,8 +769,8 @@ def build_excerpts(
         first = user_messages[0]
         excerpts.append({"channel": "user", "text": truncate(redact_text(first), 240)})
         seen.add(" ".join(first.split()))
-    if keywords:
-        terms = keyword_match_terms(keywords)
+    matcher = keyword_matcher(keywords)
+    if matcher is not None:
         for channel, messages in (("user", user_messages), ("assistant", assistant_messages)):
             for message in messages:
                 if len(excerpts) >= 3:
@@ -778,7 +778,7 @@ def build_excerpts(
                 normalized = " ".join(message.split())
                 if normalized in seen:
                     continue
-                if any(term in message.lower() for term in terms):
+                if matcher.matches(message.lower()):
                     excerpts.append({"channel": channel, "text": truncate(redact_text(message), 240)})
                     seen.add(normalized)
     return excerpts

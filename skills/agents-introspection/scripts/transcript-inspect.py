@@ -23,7 +23,7 @@ from transcript_common import (
     extract_session_lineage,
     extract_tool_failures,
     first_string_shallow,
-    keyword_match_terms,
+    keyword_matcher,
     read_jsonl_sampled_with_lines,
     redact_text,
     truncate,
@@ -202,10 +202,8 @@ def assistant_message_qualifies(text: str, keywords: list[str]) -> bool:
 
 
 def keyword_group_matches(text: str, keywords: list[str]) -> bool:
-    if not keywords:
-        return False
-    lowered = text.lower()
-    return any(term in lowered for term in keyword_match_terms(keywords))
+    matcher = keyword_matcher(keywords)
+    return matcher is not None and matcher.matches(text.lower())
 
 
 def guess_source(items: list[Any]) -> str:

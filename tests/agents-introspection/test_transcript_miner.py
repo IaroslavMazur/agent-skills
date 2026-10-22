@@ -588,25 +588,27 @@ class TranscriptMinerTests(unittest.TestCase):
         session = report["candidate_sessions"][0]
         self.assertEqual(session["keyword_hits"], {"miner|mining|transcript-miner": 1})
 
-    def test_keywords_match_regular_inflections_but_not_short_stems(self) -> None:
+    def test_keywords_match_regular_inflections_but_not_longer_words(self) -> None:
         project = self.fixture.project("inflections")
         self.fixture.codex_session(
             "inflected",
             project,
             user="the agent kept overwriting my verified files after I committed them",
         )
-        self.fixture.codex_session("short-stem", project, user="please retrieve the file")
+        self.fixture.codex_session("short-word", project, user="I retried the command while merging")
+        self.fixture.codex_session("longer-word", project, user="please retrieve the file")
 
         report = self.fixture.run([project], ["overwrite", "verify", "commit"])
         session = report["candidate_sessions"][0]
         self.assertEqual(Path(session["path"]).stem, "rollout-inflected")
         self.assertEqual(session["keyword_hits"], {"overwrite": 1, "verify": 1, "commit": 1})
 
-        report = self.fixture.run([project], ["committed"])
+        report = self.fixture.run([project], ["committed|overwritten"])
         self.assertEqual([Path(s["path"]).stem for s in report["candidate_sessions"]], ["rollout-inflected"])
 
-        report = self.fixture.run([project], ["retry"])
-        self.assertEqual(report["candidate_sessions"], [])
+        report = self.fixture.run([project], ["retry", "merge"])
+        self.assertEqual([Path(s["path"]).stem for s in report["candidate_sessions"]], ["rollout-short-word"])
+        self.assertEqual(report["candidate_sessions"][0]["keyword_hits"], {"retry": 1, "merge": 1})
 
     def test_keyword_free_pass_keeps_every_owned_session_and_ranks_by_signals(self) -> None:
         project = self.fixture.project("signals-only")
