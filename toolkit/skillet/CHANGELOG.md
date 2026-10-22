@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.1] - 2026-10-22
+
+### Fixed
+
+- Fix `.codex` state-file skipping to honor the full `*.sqlite*` glob so `*.sqlite-journal` files are excluded ([`0718565`](https://github.com/PaulRBerg/agent-skills/commit/0718565))
+
 ## [1.1.0] - 2026-10-22
 
 ### Added
@@ -14,5 +20,6 @@
 
 _First release._
 
+[1.1.1]: https://github.com/PaulRBerg/agent-skills/releases/tag/ai-skillet-v1.1.1
 [1.1.0]: https://github.com/PaulRBerg/agent-skills/releases/tag/ai-skillet-v1.1.0
 [1.0.0]: https://github.com/PaulRBerg/agent-skills/releases/tag/ai-skillet-v1.0.0
