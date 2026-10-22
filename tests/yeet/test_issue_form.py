@@ -96,7 +96,9 @@ CLI, Extension
         with self.assertRaisesRegex(MODULE.FormError, "missing required"):
             MODULE.render_form(self.form, {"terms": {"I searched for duplicates": True}, "operating-system": "macOS"})
         with self.assertRaisesRegex(MODULE.FormError, "invalid dropdown"):
-            MODULE.render_form(self.form, base | {"terms": {"I searched for duplicates": True}, "operating-system": "Windows"})
+            MODULE.render_form(
+                self.form, base | {"terms": {"I searched for duplicates": True}, "operating-system": "Windows"}
+            )
 
     def test_inspects_metadata_defaults_and_upload_accept(self) -> None:
         form = MODULE.inspect_form(

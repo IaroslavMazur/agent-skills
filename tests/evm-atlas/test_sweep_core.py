@@ -121,10 +121,15 @@ class SweepCoreTests(unittest.TestCase):
         plan = MODULE.build_plan(spec("bootstrap-discovery", model="unknown"))
         payload = responses(
             plan,
-            {"p1": {
-                "txlist": [row("txlist", value="0", **{"from": "0x" + "b" * 40}), row("txlist", value="5", isError="1")],
-                "txlistinternal": [row("txlistinternal", value="0")],
-            }},
+            {
+                "p1": {
+                    "txlist": [
+                        row("txlist", value="0", **{"from": "0x" + "b" * 40}),
+                        row("txlist", value="5", isError="1"),
+                    ],
+                    "txlistinternal": [row("txlistinternal", value="0")],
+                }
+            },
         )
         self.assertEqual(MODULE.evaluate(plan, payload)["result"], "negative")
 
@@ -151,7 +156,9 @@ class SweepCoreTests(unittest.TestCase):
         agreed = MODULE.evaluate(plan, agree)
         self.assertEqual(agreed["result"], "positive")
         self.assertTrue(agreed["quorum"]["agreement"])
-        disagree = responses(plan, {"p1": {"tokentx": [row("tokentx", TX_A)]}, "p2": {"tokentx": [row("tokentx", TX_B)]}})
+        disagree = responses(
+            plan, {"p1": {"tokentx": [row("tokentx", TX_A)]}, "p2": {"tokentx": [row("tokentx", TX_B)]}}
+        )
         disagreed = MODULE.evaluate(plan, disagree)
         self.assertEqual(disagreed["result"], "unknown")
         self.assertFalse(disagreed["quorum"]["agreement"])

@@ -51,19 +51,32 @@ class SweepLedgerTests(unittest.TestCase):
             self.assertFalse(by_path["src/new.py"]["tracked"])
             self.assertNotIn("ignored", by_path)
 
-            failed = self.helper("mark", "--ledger", str(ledger), "--status", "excluded", "--path", "src/a.py", check=False)
+            failed = self.helper(
+                "mark", "--ledger", str(ledger), "--status", "excluded", "--path", "src/a.py", check=False
+            )
             self.assertNotEqual(failed.returncode, 0)
             self.assertEqual(json.loads(ledger.read_text())["revision"], 0)
             self.helper("mark", "--ledger", str(ledger), "--status", "inspected", "--path", "src/a.py")
-            marked = json.loads(self.helper(
-                "mark", "--ledger", str(ledger), "--status", "excluded", "--reason", "agent classified generated",
-                "--path", "src/b.py",
-            ).stdout)
+            marked = json.loads(
+                self.helper(
+                    "mark",
+                    "--ledger",
+                    str(ledger),
+                    "--status",
+                    "excluded",
+                    "--reason",
+                    "agent classified generated",
+                    "--path",
+                    "src/b.py",
+                ).stdout
+            )
             self.assertEqual(marked["counts"]["accounted"], 2)
             self.assertEqual(marked["progress"]["bar"], "███████░░░")
             pending = json.loads(self.helper("pending", "--ledger", str(ledger), "--limit", "1").stdout)
             self.assertEqual(pending["paths"], ["src/new.py"])
-            final = json.loads(self.helper("mark", "--ledger", str(ledger), "--status", "fixed", "--path", "src/new.py").stdout)
+            final = json.loads(
+                self.helper("mark", "--ledger", str(ledger), "--status", "fixed", "--path", "src/new.py").stdout
+            )
             self.assertTrue(final["complete"])
             self.assertEqual(final["counts"]["fixed"], 1)
 
@@ -94,7 +107,8 @@ class SweepLedgerTests(unittest.TestCase):
             recorded = {item["path"] for item in json.loads(ledger.read_text())["files"]}
             listed = subprocess.run(
                 ["git", "-C", str(repo), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-                capture_output=True, check=True,
+                capture_output=True,
+                check=True,
             ).stdout
             expected = {value.decode() for value in listed.split(b"\0") if value}
             self.assertEqual(recorded, expected)
@@ -123,7 +137,15 @@ class SweepLedgerTests(unittest.TestCase):
             self.helper("init", "--root", str(repo), "--ledger", str(ledger))
             before = ledger.read_bytes()
             result = self.helper(
-                "mark", "--ledger", str(ledger), "--status", "reported", "--path", "a", "--path", "missing",
+                "mark",
+                "--ledger",
+                str(ledger),
+                "--status",
+                "reported",
+                "--path",
+                "a",
+                "--path",
+                "missing",
                 check=False,
             )
             self.assertNotEqual(result.returncode, 0)
@@ -146,8 +168,20 @@ class SweepLedgerTests(unittest.TestCase):
             self.helper("init", "--root", str(repo), "--ledger", str(ledger))
             workers = [
                 subprocess.Popen(
-                    [sys.executable, str(SCRIPT), "mark", "--ledger", str(ledger), "--status", "inspected", "--path", name],
-                    text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    [
+                        sys.executable,
+                        str(SCRIPT),
+                        "mark",
+                        "--ledger",
+                        str(ledger),
+                        "--status",
+                        "inspected",
+                        "--path",
+                        name,
+                    ],
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
                 )
                 for name in names
             ]

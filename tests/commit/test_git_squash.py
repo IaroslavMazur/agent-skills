@@ -32,7 +32,10 @@ def make_repo(root: Path, commits: int = 2) -> Path:
     for index in range(commits):
         (root / "file.txt").write_text((root / "file.txt").read_text() + f"change {index}\n")
         git(root, "add", "file.txt")
-        env = os.environ | {"GIT_AUTHOR_NAME": "Contributor" if index == 0 else "Squasher", "GIT_AUTHOR_EMAIL": "contributor@example.com" if index == 0 else "squasher@example.com"}
+        env = os.environ | {
+            "GIT_AUTHOR_NAME": "Contributor" if index == 0 else "Squasher",
+            "GIT_AUTHOR_EMAIL": "contributor@example.com" if index == 0 else "squasher@example.com",
+        }
         subprocess.run(["git", "-C", str(root), "commit", "-qm", f"change {index}"], check=True, env=env)
     return root
 
@@ -121,7 +124,9 @@ class GitSquashTests(unittest.TestCase):
             git(repo, "revert", "--no-edit", "HEAD")
             plan, plan_file = self.write_plan(root, repo)
             self.assertEqual(plan["aheadCount"], 2)
-            self.assert_failed(self.helper("reset", "--plan", str(plan_file), check=False), "squash would produce an empty commit")
+            self.assert_failed(
+                self.helper("reset", "--plan", str(plan_file), check=False), "squash would produce an empty commit"
+            )
             self.assertEqual(head(repo), plan["originalHead"])
             self.assertEqual(git(repo, "write-tree").stdout.strip(), plan["rollback"]["indexTree"])
             self.assertEqual(git(repo, "status", "--porcelain").stdout, "")

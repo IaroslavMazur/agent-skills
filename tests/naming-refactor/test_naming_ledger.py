@@ -47,9 +47,7 @@ class NamingLedgerTests(unittest.TestCase):
             (repo / "ignored").write_text("ignored\n")
             ledger = root / "ledger.json"
 
-            initialized = json.loads(
-                self.helper("init", "--root", str(repo), "--ledger", str(ledger)).stdout
-            )
+            initialized = json.loads(self.helper("init", "--root", str(repo), "--ledger", str(ledger)).stdout)
             self.assertEqual(initialized["counts"]["mapped"], 4)
             self.assertEqual(initialized["preexistingChangedPaths"], 2)
             payload = json.loads(ledger.read_text())
@@ -107,7 +105,8 @@ class NamingLedgerTests(unittest.TestCase):
             recorded = {item["path"] for item in json.loads(ledger.read_text())["files"]}
             listed = subprocess.run(
                 ["git", "-C", str(repo), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-                capture_output=True, check=True,
+                capture_output=True,
+                check=True,
             ).stdout
             expected = {value.decode() for value in listed.split(b"\0") if value}
             self.assertEqual(recorded, expected)
@@ -184,11 +183,7 @@ class NamingLedgerTests(unittest.TestCase):
                 b"excluded\tc.py\tgenerated fixture\r\n"
             )
 
-            result = json.loads(
-                self.helper(
-                    "mark", "--ledger", str(ledger), "--from-file", str(dispositions)
-                ).stdout
-            )
+            result = json.loads(self.helper("mark", "--ledger", str(ledger), "--from-file", str(dispositions)).stdout)
             self.assertEqual(result["applied"], 3)
             self.assertEqual(result["skipped"], [])
             self.assertEqual(result["revision"], refreshed["revision"] + 1)
@@ -215,23 +210,30 @@ class NamingLedgerTests(unittest.TestCase):
             ledger = root / "ledger.json"
             self.helper("init", "--root", str(repo), "--ledger", str(ledger))
             dispositions = root / "dispositions.tsv"
-            dispositions.write_text(
-                "pending\ta.py\tplanned: rename group 1\n"
-                "retained\tb.py\t\n"
-                "pending\tc.py\t\n"
-            )
+            dispositions.write_text("pending\ta.py\tplanned: rename group 1\nretained\tb.py\t\npending\tc.py\t\n")
 
             failed = self.helper(
-                "mark", "--ledger", str(ledger), "--from-file", str(dispositions),
-                "--pending-as", "blocked", check=False,
+                "mark",
+                "--ledger",
+                str(ledger),
+                "--from-file",
+                str(dispositions),
+                "--pending-as",
+                "blocked",
+                check=False,
             )
             self.assertEqual(failed.returncode, 64)
             self.assertIn("blocked status requires a reason", failed.stderr)
 
             result = json.loads(
                 self.helper(
-                    "mark", "--ledger", str(ledger), "--from-file", str(dispositions),
-                    "--pending-as", "renamed",
+                    "mark",
+                    "--ledger",
+                    str(ledger),
+                    "--from-file",
+                    str(dispositions),
+                    "--pending-as",
+                    "renamed",
                 ).stdout
             )
             self.assertEqual(result["applied"], 3)
@@ -243,8 +245,16 @@ class NamingLedgerTests(unittest.TestCase):
             self.assertEqual(by_path["c.py"]["status"], "renamed")
 
             invalid = self.helper(
-                "mark", "--ledger", str(ledger), "--status", "renamed", "--path", "a.py",
-                "--pending-as", "renamed", check=False,
+                "mark",
+                "--ledger",
+                str(ledger),
+                "--status",
+                "renamed",
+                "--path",
+                "a.py",
+                "--pending-as",
+                "renamed",
+                check=False,
             )
             self.assertEqual(invalid.returncode, 2)
 
@@ -260,9 +270,7 @@ class NamingLedgerTests(unittest.TestCase):
             self.helper("init", "--root", str(repo), "--ledger", str(ledger))
             dispositions = root / "dispositions.tsv"
             dispositions.write_text(
-                "retained\ta.py\t\n"
-                "excluded\tcache.stats.csv\tignored cache\n"
-                "renamed\tempty-directory\tdelegated path\n"
+                "retained\ta.py\t\nexcluded\tcache.stats.csv\tignored cache\nrenamed\tempty-directory\tdelegated path\n"
             )
             before = ledger.read_bytes()
 
@@ -390,7 +398,9 @@ class NamingLedgerTests(unittest.TestCase):
             git(repo, "commit", "-qm", "initial")
             ledger = root / "ledger.json"
             self.helper("init", "--root", str(repo), "--ledger", str(ledger))
-            retained = json.loads(self.helper("mark", "--ledger", str(ledger), "--status", "retained", "--path", "a.py").stdout)
+            retained = json.loads(
+                self.helper("mark", "--ledger", str(ledger), "--status", "retained", "--path", "a.py").stdout
+            )
             self.assertTrue(retained["complete"])
 
             (repo / "a.py").unlink()

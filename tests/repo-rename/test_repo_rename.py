@@ -45,11 +45,11 @@ class RepoRenameTests(unittest.TestCase):
         gh = self.bin / "gh"
         gh.write_text(
             "#!/bin/sh\n"
-            "if [ \"$1 $2 $3\" = \"repo view --json\" ]; then\n"
-            "  printf '%s\\n' '{\"nameWithOwner\":\"owner/old-repo\",\"sshUrl\":\"git@github.com:owner/old-repo.git\",\"url\":\"https://github.com/owner/old-repo\"}'\n"
+            'if [ "$1 $2 $3" = "repo view --json" ]; then\n'
+            '  printf \'%s\\n\' \'{"nameWithOwner":"owner/old-repo","sshUrl":"git@github.com:owner/old-repo.git","url":"https://github.com/owner/old-repo"}\'\n'
             "  exit 0\n"
             "fi\n"
-            "printf '%s\\n' \"$*\" >> \"$HOME/gh-writes\"\n",
+            'printf \'%s\\n\' "$*" >> "$HOME/gh-writes"\n',
             encoding="utf-8",
         )
         gh.chmod(gh.stat().st_mode | stat.S_IXUSR)
@@ -75,7 +75,9 @@ class RepoRenameTests(unittest.TestCase):
         )
 
     def test_dry_run_has_no_mutations(self) -> None:
-        before = subprocess.run(["git", "status", "--short"], cwd=self.repo, text=True, capture_output=True, check=True).stdout
+        before = subprocess.run(
+            ["git", "status", "--short"], cwd=self.repo, text=True, capture_output=True, check=True
+        ).stdout
         result = self.run_script("new-repo", "--dry-run")
         self.assertEqual(result.returncode, 0, result.stderr)
         report = json.loads(result.stdout)
@@ -83,7 +85,9 @@ class RepoRenameTests(unittest.TestCase):
         self.assertTrue(self.repo.exists())
         self.assertFalse((self.root / "new-repo").exists())
         self.assertFalse((Path(self.env["HOME"]) / "gh-writes").exists())
-        after = subprocess.run(["git", "status", "--short"], cwd=self.repo, text=True, capture_output=True, check=True).stdout
+        after = subprocess.run(
+            ["git", "status", "--short"], cwd=self.repo, text=True, capture_output=True, check=True
+        ).stdout
         self.assertEqual(after, before)
 
     def test_apply_rejects_missing_confirmation(self) -> None:
@@ -122,7 +126,9 @@ class RepoRenameTests(unittest.TestCase):
         self.assertEqual((destination / "README.md").read_text(), f"old-repo\n{new_path}/src\n")
         moved_project = claude / re.sub(r"[^A-Za-z0-9]", "-", new_path)
         self.assertEqual(json.loads((moved_project / "session.jsonl").read_text())["cwd"], new_path)
-        remote = subprocess.run(["git", "remote", "get-url", "origin"], cwd=destination, text=True, capture_output=True, check=True)
+        remote = subprocess.run(
+            ["git", "remote", "get-url", "origin"], cwd=destination, text=True, capture_output=True, check=True
+        )
         self.assertEqual(remote.stdout.strip(), "git@github.com:owner/old-repo.git")
         self.assertFalse((Path(self.env["HOME"]) / "gh-writes").exists())
 
@@ -172,7 +178,9 @@ class RepoRenameTests(unittest.TestCase):
                 HELPER.apply(plan)
         self.assertEqual(readme.read_text(), old_text)
         self.assertFalse(destination.parent.parent.exists())
-        status = subprocess.run(["git", "status", "--porcelain"], cwd=self.repo, text=True, capture_output=True, check=True)
+        status = subprocess.run(
+            ["git", "status", "--porcelain"], cwd=self.repo, text=True, capture_output=True, check=True
+        )
         self.assertEqual(status.stdout, "")
 
     def test_claude_move_failure_restores_files_in_place(self) -> None:
@@ -213,9 +221,12 @@ class RepoRenameTests(unittest.TestCase):
         self.assertEqual(json.loads(result.stdout)["mutations"][-1]["files"], [])
         result = self.run_script(str(self.repo), str(destination), "--dry-run", "--include-local-state")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(json.loads(result.stdout)["mutations"][-1]["files"], [
-            {"path": str(ignored.resolve()), "occurrences": 1},
-        ])
+        self.assertEqual(
+            json.loads(result.stdout)["mutations"][-1]["files"],
+            [
+                {"path": str(ignored.resolve()), "occurrences": 1},
+            ],
+        )
 
     def test_preview_and_apply_preserve_protected_and_external_files(self) -> None:
         notes = self.repo / ".ai"
@@ -379,7 +390,9 @@ class RepoRenameTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertTrue(report["include_local_state"])
         self.assertEqual(len(report["mutations"][-1]["files"]), 5)
-        result = self.run_script("new-repo", "--apply", "--include-local-state", "--confirm", "owner/old-repo->owner/new-repo")
+        result = self.run_script(
+            "new-repo", "--apply", "--include-local-state", "--confirm", "owner/old-repo->owner/new-repo"
+        )
         self.assertEqual(result.returncode, 0, result.stderr)
         for name in files:
             target = self.root / "new-repo" / name

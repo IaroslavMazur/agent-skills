@@ -27,10 +27,16 @@ PAYLOAD = {
         {"id": "involved", "model": "gpt-6.1-sol", "effort": "medium", "description": "Involved work."},
     ],
 }
-ANSWER = {"answers": {"configuration": {
-    "type": "score", "score": 0.9, "confidence": 0.8,
-    "probabilities": {"0": 0.1, "1": 0.9},
-}}}
+ANSWER = {
+    "answers": {
+        "configuration": {
+            "type": "score",
+            "score": 0.9,
+            "confidence": 0.8,
+            "probabilities": {"0": 0.1, "1": 0.9},
+        }
+    }
+}
 
 
 def ladder_payload(count):
@@ -43,10 +49,15 @@ def ladder_answer(levels, confidence=None):
     """Build a Score answer whose confidence follows Jev's formula unless overridden."""
     if confidence is None:
         confidence = ROUTER.score_confidence(levels, levels.index(max(levels)))[0]
-    return {"answers": {"configuration": {
-        "type": "score", "confidence": confidence,
-        "probabilities": {str(index): value for index, value in enumerate(levels)},
-    }}}
+    return {
+        "answers": {
+            "configuration": {
+                "type": "score",
+                "confidence": confidence,
+                "probabilities": {str(index): value for index, value in enumerate(levels)},
+            }
+        }
+    }
 
 
 class SelectModelTests(unittest.TestCase):
@@ -65,8 +76,17 @@ class SelectModelTests(unittest.TestCase):
 
     def test_success_uses_ordered_ladder_and_evaluate_wire(self):
         result, opener, response = self.call()
-        self.assertEqual(result, {"status": "selected", "id": "involved", "model": "gpt-6.1-sol",
-                                  "effort": "medium", "confidence": 0.8, "rule": "confidence"})
+        self.assertEqual(
+            result,
+            {
+                "status": "selected",
+                "id": "involved",
+                "model": "gpt-6.1-sol",
+                "effort": "medium",
+                "confidence": 0.8,
+                "rule": "confidence",
+            },
+        )
         opener.open.assert_called_once()
         request = opener.open.call_args.args[0]
         self.assertEqual(request.full_url, "https://ai-gateway.vercel.sh/v1/evaluate")
@@ -84,17 +104,23 @@ class SelectModelTests(unittest.TestCase):
 
     def test_missing_auth_and_fixed_configuration_skip_network(self):
         with patch.object(ROUTER, "evaluate") as evaluate:
-            self.assertEqual(ROUTER.select_configuration(PAYLOAD, None),
-                             {"status": "fallback", "reason": "missing_auth"})
+            self.assertEqual(
+                ROUTER.select_configuration(PAYLOAD, None), {"status": "fallback", "reason": "missing_auth"}
+            )
             fixed = copy.deepcopy(PAYLOAD)
             fixed["candidates"] = fixed["candidates"][:1]
             self.assertEqual(ROUTER.select_configuration(fixed, "test-placeholder")["reason"], "fixed_configuration")
             evaluate.assert_not_called()
 
     def test_invalid_inputs_do_not_send_task(self):
-        cases = [{}, {**PAYLOAD, "task": ""}, {**PAYLOAD, "context": []},
-                 {**PAYLOAD, "candidates": []}, {**PAYLOAD, "candidates": [None]},
-                 ladder_payload(ROUTER.MAX_CANDIDATES + 1)]
+        cases = [
+            {},
+            {**PAYLOAD, "task": ""},
+            {**PAYLOAD, "context": []},
+            {**PAYLOAD, "candidates": []},
+            {**PAYLOAD, "candidates": [None]},
+            ladder_payload(ROUTER.MAX_CANDIDATES + 1),
+        ]
         duplicate = copy.deepcopy(PAYLOAD)
         duplicate["candidates"][1]["id"] = "routine"
         cases.append(duplicate)
@@ -104,11 +130,26 @@ class SelectModelTests(unittest.TestCase):
                 evaluate.assert_not_called()
 
     def test_malformed_or_oversized_wire_falls_back(self):
-        cases = [b"{", b"\xff", b"[]", b'{"answers":{},"answers":{}}',
-                 b"x" * (ROUTER.MAX_BYTES + 1), {}, {"answers": []},
-                 {"answers": {"configuration": {"type": "text", "text": "involved"}}},
-                 {"answers": {"configuration": {"type": "choice", "choice": "involved", "confidence": 0.8,
-                                                "probabilities": {"routine": 0.1, "involved": 0.9}}}}]
+        cases = [
+            b"{",
+            b"\xff",
+            b"[]",
+            b'{"answers":{},"answers":{}}',
+            b"x" * (ROUTER.MAX_BYTES + 1),
+            {},
+            {"answers": []},
+            {"answers": {"configuration": {"type": "text", "text": "involved"}}},
+            {
+                "answers": {
+                    "configuration": {
+                        "type": "choice",
+                        "choice": "involved",
+                        "confidence": 0.8,
+                        "probabilities": {"routine": 0.1, "involved": 0.9},
+                    }
+                }
+            },
+        ]
         for answer in cases:
             with self.subTest(answer=str(answer)[:40]):
                 self.assertEqual(self.call(answer)[0]["reason"], "invalid_response")
@@ -142,8 +183,9 @@ class SelectModelTests(unittest.TestCase):
         for levels, confidence in (([0.49, 0.51], 1), ([0.1, 0.9], 0.78), ([0.72, 0.27, 0.01, 0], 0.6)):
             with self.subTest(levels=levels, confidence=confidence):
                 result = self.call(ladder_answer(levels, confidence), payload=ladder_payload(len(levels)))[0]
-                self.assertEqual(result, {"status": "fallback", "reason": "invalid_response",
-                                          "detail": "confidence_consistency"})
+                self.assertEqual(
+                    result, {"status": "fallback", "reason": "invalid_response", "detail": "confidence_consistency"}
+                )
 
     def test_live_score_distributions_match_formula_within_rounding(self):
         # Distributions and confidences observed from Jev, rounded independently to hundredths.
@@ -158,8 +200,10 @@ class SelectModelTests(unittest.TestCase):
         for levels, confidence, expected_id, rule in cases:
             with self.subTest(levels=levels):
                 result = self.call(ladder_answer(levels, confidence), payload=ladder_payload(len(levels)))[0]
-                self.assertEqual((result["status"], result["id"], result["rule"], result["confidence"]),
-                                 ("selected", expected_id, rule, confidence))
+                self.assertEqual(
+                    (result["status"], result["id"], result["rule"], result["confidence"]),
+                    ("selected", expected_id, rule, confidence),
+                )
 
     def test_adjacent_tier_split_selects_higher_probability_tier(self):
         cases = [
@@ -213,9 +257,14 @@ class SelectModelTests(unittest.TestCase):
             with self.subTest(detail=detail):
                 answer = copy.deepcopy(ANSWER)
                 answer["answers"]["configuration"].update(probabilities=probabilities, confidence=confidence)
-                self.assertEqual(self.call(answer)[0], {
-                    "status": "fallback", "reason": "invalid_response", "detail": detail,
-                })
+                self.assertEqual(
+                    self.call(answer)[0],
+                    {
+                        "status": "fallback",
+                        "reason": "invalid_response",
+                        "detail": detail,
+                    },
+                )
 
     def test_validation_diagnostics_never_echo_response_or_credential(self):
         private = "malicious-response-and-test-placeholder"
@@ -231,14 +280,21 @@ class SelectModelTests(unittest.TestCase):
                 self.assertNotIn(private, json.dumps(result))
                 self.assertNotIn("test-placeholder", json.dumps(result))
         with patch.object(ROUTER, "evaluate", side_effect=ROUTER.InvalidData(private)):
-            self.assertEqual(ROUTER.select_configuration(PAYLOAD, "test-placeholder"), {
-                "status": "fallback", "reason": "invalid_response",
-            })
+            self.assertEqual(
+                ROUTER.select_configuration(PAYLOAD, "test-placeholder"),
+                {
+                    "status": "fallback",
+                    "reason": "invalid_response",
+                },
+            )
 
     def test_api_failure_timeout_and_redirects_use_safe_codes(self):
         for error, expected in (
             (urllib.error.URLError("private diagnostics"), "api_unavailable"),
-            (urllib.error.HTTPError(ROUTER.ENDPOINT, 401, "private body", {}, io.BytesIO(b"secret")), "api_unavailable"),
+            (
+                urllib.error.HTTPError(ROUTER.ENDPOINT, 401, "private body", {}, io.BytesIO(b"secret")),
+                "api_unavailable",
+            ),
             (TimeoutError("private diagnostics"), "timeout"),
             (ROUTER.DeadlineExpired(), "timeout"),
             (urllib.error.URLError(TimeoutError()), "timeout"),
@@ -270,10 +326,14 @@ class SelectModelTests(unittest.TestCase):
     def test_cli_emits_only_safe_json_and_no_secret_or_input(self):
         environment = dict(os.environ)
         environment.pop("AI_GATEWAY_API_KEY", None)
-        for raw, reason in ((json.dumps(PAYLOAD), "missing_auth"), ("{private-input", "invalid_input"),
-                            ("x" * (ROUTER.MAX_BYTES + 1), "invalid_input")):
-            result = subprocess.run([sys.executable, str(SCRIPT)], input=raw, text=True, capture_output=True,
-                                    env=environment, timeout=2)
+        for raw, reason in (
+            (json.dumps(PAYLOAD), "missing_auth"),
+            ("{private-input", "invalid_input"),
+            ("x" * (ROUTER.MAX_BYTES + 1), "invalid_input"),
+        ):
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT)], input=raw, text=True, capture_output=True, env=environment, timeout=2
+            )
             self.assertEqual(result.returncode, 0)
             self.assertEqual(json.loads(result.stdout), {"status": "fallback", "reason": reason})
             self.assertEqual(result.stderr, "")

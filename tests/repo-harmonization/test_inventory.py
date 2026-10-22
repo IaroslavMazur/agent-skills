@@ -225,7 +225,6 @@ class InventoryTests(unittest.TestCase):
                 self.assertEqual(result.stdout, "")
 
 
-
 class DriftTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
@@ -289,6 +288,7 @@ class DriftTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 2)
                 self.assertIn(message, result.stderr)
                 self.assertEqual(result.stdout, "")
+
 
 if __name__ == "__main__":
     unittest.main()

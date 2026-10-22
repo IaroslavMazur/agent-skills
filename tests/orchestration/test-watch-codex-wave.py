@@ -35,8 +35,22 @@ class WatchCodexWaveTests(unittest.TestCase):
             thread = threading.Thread(target=write_progress)
             thread.start()
             result = subprocess.run(
-                ["bash", str(SCRIPT), "--agent", "A1", "10", str(first), "--agent", "A2", "20", str(second),
-                 "--digest-seconds", "0.04", "--poll-seconds", "0.01"],
+                [
+                    "bash",
+                    str(SCRIPT),
+                    "--agent",
+                    "A1",
+                    "10",
+                    str(first),
+                    "--agent",
+                    "A2",
+                    "20",
+                    str(second),
+                    "--digest-seconds",
+                    "0.04",
+                    "--poll-seconds",
+                    "0.01",
+                ],
                 text=True,
                 capture_output=True,
                 timeout=5,
@@ -44,7 +58,9 @@ class WatchCodexWaveTests(unittest.TestCase):
             thread.join()
             self.assertEqual(result.returncode, 1, result.stderr)
             records = [json.loads(line) for line in result.stdout.splitlines()]
-            self.assertTrue(any(record["type"] == "watcher.digest" and record["noRecentActivity"] for record in records))
+            self.assertTrue(
+                any(record["type"] == "watcher.digest" and record["noRecentActivity"] for record in records)
+            )
             sentinels = [record for record in records if record["type"] == "watcher.sentinel"]
             self.assertEqual([record["agentId"] for record in sentinels], ["A1", "A2"])
             self.assertEqual(sentinels[1]["reason"], "timeout")
@@ -75,8 +91,18 @@ class WatchCodexWaveTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             progress = Path(directory) / "missing.progress.jsonl"
             result = subprocess.run(
-                ["bash", str(SCRIPT), "--agent", "A1", "0.03", str(progress),
-                 "--no-sentinel-grace-seconds", "0.02", "--poll-seconds", "0.01"],
+                [
+                    "bash",
+                    str(SCRIPT),
+                    "--agent",
+                    "A1",
+                    "0.03",
+                    str(progress),
+                    "--no-sentinel-grace-seconds",
+                    "0.02",
+                    "--poll-seconds",
+                    "0.01",
+                ],
                 text=True,
                 capture_output=True,
                 timeout=2,
@@ -109,8 +135,22 @@ class WatchCodexWaveTests(unittest.TestCase):
             thread = threading.Thread(target=write_progress)
             thread.start()
             result = subprocess.run(
-                ["bash", str(SCRIPT), "--agent", "A1", "0.03", str(stalled), "--agent", "A2", "2", str(healthy),
-                 "--no-sentinel-grace-seconds", "0.02", "--poll-seconds", "0.01"],
+                [
+                    "bash",
+                    str(SCRIPT),
+                    "--agent",
+                    "A1",
+                    "0.03",
+                    str(stalled),
+                    "--agent",
+                    "A2",
+                    "2",
+                    str(healthy),
+                    "--no-sentinel-grace-seconds",
+                    "0.02",
+                    "--poll-seconds",
+                    "0.01",
+                ],
                 text=True,
                 capture_output=True,
                 timeout=5,
@@ -220,8 +260,18 @@ class WatchCodexWaveTests(unittest.TestCase):
                 thread = threading.Thread(target=finish)
                 thread.start()
                 result = subprocess.run(
-                    ["bash", str(SCRIPT), "--agent", "A1", "2", str(progress),
-                     "--digest-seconds", "0.02", "--poll-seconds", "0.01"],
+                    [
+                        "bash",
+                        str(SCRIPT),
+                        "--agent",
+                        "A1",
+                        "2",
+                        str(progress),
+                        "--digest-seconds",
+                        "0.02",
+                        "--poll-seconds",
+                        "0.01",
+                    ],
                     text=True,
                     capture_output=True,
                     timeout=2,

@@ -26,9 +26,7 @@ RECALC = SCRIPTS / "recalc.py"
 def run(args: list[str], check: bool = True) -> subprocess.CompletedProcess[str]:
     result = subprocess.run(args, capture_output=True, text=True, check=False)
     if check and result.returncode != 0:
-        raise AssertionError(
-            f"command failed: {' '.join(args)}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-        )
+        raise AssertionError(f"command failed: {' '.join(args)}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}")
     return result
 
 
@@ -64,9 +62,7 @@ def test_peek(tmp: Path) -> None:
 def test_profile(tmp: Path) -> None:
     risky = tmp / "risky.tsv"
     risky.write_text("asset\tamount\tnote\nETH\t1.0\t=cmd\nBTC\t-\t+cmd\n", encoding="utf-8")
-    _, payload = run_json(
-        [sys.executable, str(PROFILE), str(risky), "--redact-samples", "--top", "2"]
-    )
+    _, payload = run_json([sys.executable, str(PROFILE), str(risky), "--redact-samples", "--top", "2"])
     assert payload["schema_version"] == 2
     assert payload["status"] == "ok"
     assert payload["formula_prefix_cells"]["count"] == 2

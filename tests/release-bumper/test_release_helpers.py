@@ -44,9 +44,7 @@ def discovery(*, beta: bool = False) -> dict:
         "explicitVersion": None,
         "packages": packages,
         "targets": [packages[0]],
-        "dependencyEdges": [
-            {"from": "b", "to": "a", "type": "dependencies", "name": "@scope/a", "range": "^1.2.3"}
-        ],
+        "dependencyEdges": [{"from": "b", "to": "a", "type": "dependencies", "name": "@scope/a", "range": "^1.2.3"}],
         "previousTags": {},
     }
 

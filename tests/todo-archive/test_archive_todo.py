@@ -37,9 +37,7 @@ More non-task content.
         tree = archive_todo.parse_document(source.splitlines(keepends=True))
         archive_todo.mark_tasks(tree, hint=None, in_section=True)
 
-        remaining = archive_todo.finalize(
-            archive_todo.render(tree, archive=False), fallback_heading="# TODO\n"
-        )
+        remaining = archive_todo.finalize(archive_todo.render(tree, archive=False), fallback_heading="# TODO\n")
 
         self.assertEqual(
             remaining,
@@ -148,8 +146,7 @@ class ArchiveCommandTests(unittest.TestCase):
             todo_path = root / ".ai/TODO.md"
             todo_path.parent.mkdir()
             todo_path.write_text(
-                "# TODO\n\n## Fixes\n\n- [x] Fix\n\n### Nested\n\n- [x] Nested fix\n\n"
-                "## Other\n\n- [x] Other done\n",
+                "# TODO\n\n## Fixes\n\n- [x] Fix\n\n### Nested\n\n- [x] Nested fix\n\n## Other\n\n- [x] Other done\n",
                 encoding="utf-8",
             )
 
@@ -161,9 +158,7 @@ class ArchiveCommandTests(unittest.TestCase):
                 (root / ".ai/todos/2026-07/06.md").read_text(encoding="utf-8"),
                 "# TODO\n\n## Fixes\n\n- [x] Fix\n\n### Nested\n\n- [x] Nested fix\n",
             )
-            self.assertEqual(
-                todo_path.read_text(encoding="utf-8"), "# TODO\n\n## Other\n\n- [x] Other done\n"
-            )
+            self.assertEqual(todo_path.read_text(encoding="utf-8"), "# TODO\n\n## Other\n\n- [x] Other done\n")
 
     def test_no_checked_tasks_and_unknown_hint_remain_noops(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -186,14 +181,13 @@ class ArchiveCommandTests(unittest.TestCase):
 
 class MergeArchiveTests(unittest.TestCase):
     def test_keeps_distinct_leading_h1s(self) -> None:
-        merged = archive_todo.merge_archive_text(
-            "# Earlier\n\n- [x] First\n", "# TODO\n\n- [x] Second\n"
-        )
+        merged = archive_todo.merge_archive_text("# Earlier\n\n- [x] First\n", "# TODO\n\n- [x] Second\n")
 
         self.assertEqual(
             merged,
             "# Earlier\n\n- [x] First\n\n# TODO\n\n- [x] Second\n",
         )
+
 
 if __name__ == "__main__":
     unittest.main()
