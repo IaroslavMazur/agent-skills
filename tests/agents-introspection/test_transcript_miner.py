@@ -589,6 +589,46 @@ class TranscriptMinerTests(unittest.TestCase):
         session = report["candidate_sessions"][0]
         self.assertEqual(session["keyword_hits"], {"miner|mining|transcript-miner": 1})
 
+    def test_keywords_match_regular_inflections_but_not_short_stems(self) -> None:
+        project = self.fixture.project("inflections")
+        self.fixture.codex_session(
+            "inflected",
+            project,
+            user="the agent kept overwriting my verified files after I committed them",
+        )
+        self.fixture.codex_session("short-stem", project, user="please retrieve the file")
+
+        report = self.fixture.run([project], ["overwrite", "verify", "commit"])
+        session = report["candidate_sessions"][0]
+        self.assertEqual(Path(session["path"]).stem, "rollout-inflected")
+        self.assertEqual(session["keyword_hits"], {"overwrite": 1, "verify": 1, "commit": 1})
+
+        report = self.fixture.run([project], ["committed"])
+        self.assertEqual([Path(s["path"]).stem for s in report["candidate_sessions"]], ["rollout-inflected"])
+
+        report = self.fixture.run([project], ["retry"])
+        self.assertEqual(report["candidate_sessions"], [])
+
+    def test_keyword_free_pass_keeps_every_owned_session_and_ranks_by_signals(self) -> None:
+        project = self.fixture.project("signals-only")
+        self.fixture.codex_session("quiet", project, user="implement the feature", assistant="done")
+        self.fixture.codex_session(
+            "corrected",
+            project,
+            user="actually that is wrong, follow AGENTS.md instructions",
+            assistant="fixed and tests pass",
+        )
+
+        report = self.fixture.run([project], [])
+
+        stems = [Path(session["path"]).stem for session in report["candidate_sessions"]]
+        self.assertEqual(stems, ["rollout-corrected", "rollout-quiet"])
+        self.assertEqual(report["candidate_sessions"][0]["keyword_hits"], {})
+        self.assertTrue(report["candidate_sessions"][0]["correction_signals"])
+        coverage = coverage_by_project(report)[project]
+        self.assertEqual(coverage["structurally_matched"], 2)
+        self.assertEqual(coverage["relevance_matched"], 2)
+
     def test_prescan_keeps_user_matches_and_gate_still_excludes_body_only_matches(self) -> None:
         project = self.fixture.project("prescan")
         self.fixture.codex_session(

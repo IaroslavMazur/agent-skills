@@ -196,6 +196,22 @@ class TranscriptInspectTests(unittest.TestCase):
         assistant_texts = {entry["text"] for entry in entries if entry["channel"] == "assistant"}
         self.assertEqual(assistant_texts, {"found the needle here", "also matched via haystack alternative"})
 
+    def test_keyword_filtering_matches_regular_inflections(self) -> None:
+        path = self.root / "session.jsonl"
+        records = [
+            session_meta("s1", "/repo"),
+            message_record("user", "please look into this"),
+            message_record("assistant", "I am overwriting the config now"),
+            message_record("assistant", "unrelated reply about something else"),
+        ]
+        write_jsonl(path, records)
+
+        report = run_inspector([path], keywords=["overwrite"])
+        entries = report["files"][0]["entries"]
+
+        assistant_texts = {entry["text"] for entry in entries if entry["channel"] == "assistant"}
+        self.assertEqual(assistant_texts, {"I am overwriting the config now"})
+
     def test_tool_failure_entry_reports_status_and_snippet(self) -> None:
         path = self.root / "session.jsonl"
         records = [
