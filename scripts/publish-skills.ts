@@ -250,54 +250,33 @@ function readSourceFileIndex(): string[] {
     .filter((sourcePath) => sourcePath && nodeKind(path.join(config.sourceRoot, sourcePath)) !== "missing");
 }
 
-function readFrontmatter(skillFile: string): string {
+function readFrontmatter(skillFile: string): Record<string, unknown> {
   const text = fs.readFileSync(skillFile, "utf8");
-  const frontmatter = text.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1];
-  if (frontmatter === undefined) throw new Error(`${skillFile}: missing YAML frontmatter.`);
+  const block = text.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1];
+  if (block === undefined) throw new Error(`${skillFile}: missing YAML frontmatter.`);
+  let frontmatter: unknown;
+  try {
+    frontmatter = Bun.YAML.parse(block);
+  } catch (error) {
+    throw new Error(`${skillFile}: malformed YAML frontmatter: ${errorMessage(error)}`);
+  }
+  if (!isObject(frontmatter)) throw new Error(`${skillFile}: YAML frontmatter is not a mapping.`);
   return frontmatter;
 }
 
-function readInstallTarget(skillFile: string, frontmatter: string): InstallTarget {
-  const lines = frontmatter.split(/\r?\n/);
-  let value: string | undefined;
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    if (!line || !/^metadata:\s*$/.test(line)) continue;
-    for (index += 1; index < lines.length; index += 1) {
-      const nestedLine = lines[index];
-      if (nestedLine === undefined || !/^(?:\s|$)/.test(nestedLine)) break;
-      const match = nestedLine.match(/^\s{2}install-targets:\s*(.*?)\s*$/);
-      if (match?.[1] !== undefined) value = stripYamlQuotes(match[1]);
-    }
-    break;
-  }
-
+function readInstallTarget(skillFile: string, frontmatter: Record<string, unknown>): InstallTarget {
+  const value = isObject(frontmatter.metadata) ? frontmatter.metadata["install-targets"] : undefined;
   if (value === undefined || value === "claude-code codex") return "shared";
   if (value === "claude-code") return "claude";
   if (value === "codex") return "codex";
   throw new Error(`${skillFile}: invalid metadata.install-targets: ${JSON.stringify(value)}`);
 }
 
-function validateFrontmatterName(skillFile: string, directoryName: string, frontmatter: string): void {
-  for (const line of frontmatter.split(/\r?\n/)) {
-    const match = line.match(/^name:\s*(.*?)\s*$/);
-    if (match?.[1] === undefined) continue;
-    const value = stripYamlQuotes(match[1]);
-    if (value !== directoryName) {
-      throw new Error(`${skillFile}: frontmatter name "${value}" does not match directory "${directoryName}"`);
-    }
-    return;
-  }
-}
-
-function stripYamlQuotes(value: string): string {
-  if (
-    value.length >= 2 &&
-    ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))
-  ) {
-    return value.slice(1, -1);
-  }
-  return value;
+function validateFrontmatterName(skillFile: string, directoryName: string, frontmatter: Record<string, unknown>): void {
+  if (frontmatter.name === undefined || String(frontmatter.name) === directoryName) return;
+  throw new Error(
+    `${skillFile}: frontmatter name "${String(frontmatter.name)}" does not match directory "${directoryName}"`,
+  );
 }
 
 function readCliLock(): CliLock {

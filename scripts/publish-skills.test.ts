@@ -173,6 +173,25 @@ test("planner rejects invalid source and CLI lock metadata", () => {
   assert.match(versionResult.stderr, /expected skills CLI lock version 3/);
 });
 
+test("planner reads install targets from any valid YAML metadata layout", () => {
+  const fixture = createFixture();
+  const skillsRoot = path.join(fixture.sourceRoot, "skills");
+  fs.writeFileSync(
+    path.join(skillsRoot, "beta", "SKILL.md"),
+    "---\nmetadata:\n    install-targets: 'claude-code'\nname: beta\ndescription: beta\n---\n",
+  );
+  fs.writeFileSync(
+    path.join(skillsRoot, "gamma", "SKILL.md"),
+    "---\nmetadata: { install-targets: codex }\nname: gamma\ndescription: gamma\n---\n",
+  );
+
+  const { json, result } = runJson(fixture, "plan", "--json");
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(json.groups.claude, ["beta"]);
+  assert.deepEqual(json.groups.codex, ["gamma"]);
+  assert.deepEqual(json.groups.remove, []);
+});
+
 test("planner rejects frontmatter name that does not match its directory", () => {
   const fixture = createFixture();
   const skillFile = path.join(fixture.sourceRoot, "skills", "beta", "SKILL.md");

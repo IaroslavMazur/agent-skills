@@ -140,6 +140,10 @@ class SweepCoreTests(unittest.TestCase):
         post_result = MODULE.evaluate(plan, post_cutoff)
         self.assertEqual(post_result["result"], "unknown")
         self.assertTrue(any("post-checkpoint" in gap["reason"] for gap in post_result["gaps"]))
+        null_hash = responses(plan)
+        null_hash["state"]["nonce"]["blockHash"] = None
+        null_result = MODULE.evaluate(plan, null_hash)
+        self.assertTrue(any("not bound to the checkpoint" in gap["reason"] for gap in null_result["gaps"]))
 
     def test_quorum_agreement_and_disagreement(self) -> None:
         plan = MODULE.build_plan(spec(quorum=2, providers=2))

@@ -45,7 +45,7 @@ From a clone, `just toolkit::install-cli` installs the supported CLIs into `~/.l
 | wrap-up              | Agent tooling | Wind down a session fast: collect subagent wrap-ups and hand off the rest |
 | cli-cast             | Crypto        | Foundry cast CLI guidance                                                 |
 | cli-coingecko        | Crypto        | CoinGecko CLI for prices and market data                                  |
-| evm-atlas            | Crypto        | EVM lookup + DEX transaction/order interpretation                         |
+| evm-atlas            | Crypto        | EVM chain, account, bridge, and DEX evidence lookups                      |
 | pdf                  | Documents     | Exact local PDF reading and manipulation on macOS                         |
 | spreadsheets         | Documents     | Opinionated CSV/TSV/XLSX wrangling on macOS                               |
 | writing-editor       | Documents     | Surgical grammar and phrasing edits that keep writing natural and casual  |
@@ -54,7 +54,7 @@ From a clone, `just toolkit::install-cli` installs the supported CLIs into `~/.l
 | codebase-design      | Engineering   | Deep-module vocabulary and agent-legible codebase design                  |
 | effect-ts            | Engineering   | Effect 4 patterns and source-aligned guidance                             |
 | fresh-eyes-sweep     | Engineering   | Whole-repository audit of code, tests, and comments with verified fixes   |
-| large-file-refactor  | Engineering   | Large source-file report and Serena split plans                           |
+| large-file-refactor  | Engineering   | Large source-file report and semantic split plans                         |
 | naming-refactor      | Engineering   | Exhaustive behavior-preserving repository naming refactor                 |
 | node-deps-bumper     | Engineering   | Node.js dependency updates via taze                                       |
 | repo-harmonization   | Engineering   | Align interdependent repositories and transfer practices between them     |
@@ -76,6 +76,9 @@ From a clone, `just toolkit::install-cli` installs the supported CLIs into `~/.l
 | chromium-browser     | Research      | Shared Chromium browsing, DevTools automation, and Wayback research       |
 | tool-finder          | Research      | Find and compare current developer tools                                  |
 
+Some mechanical skills pin `model: sonnet` in their frontmatter so they do not spend a more capable inherited model
+where deterministic tooling already carries the workflow.
+
 ## Forked Skills
 
 This table lists confirmed whole-skill sources. See the [provenance index](.agents/skill-upstreams/README.md) for
@@ -89,9 +92,6 @@ merge.
 | grill-me        | [mattpocock/skills: grilling](https://github.com/mattpocock/skills/tree/main/skills/productivity/grilling)                                             |
 | html-playground | [anthropics/claude-plugins-official: playground](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/playground/skills/playground) |
 | retro           | [mattpocock/skills: retro](https://github.com/mattpocock/skills/tree/main/skills/engineering/retro)                                                    |
-
-Some mechanical skills pin `model: sonnet` in their frontmatter so they do not spend a more capable inherited model
-where deterministic tooling already carries the workflow.
 
 ## CLIs
 

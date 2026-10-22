@@ -124,29 +124,18 @@ test("generator routes a Blockscout overlay API host into resolve-chain.sh", () 
   }
 });
 
-test("generator rejects a missing chain category", () => {
-  const fixture = createFixture({ categories: [undefined, "zk"] });
-  try {
-    const result = fixture.run();
-    expect(result.exitCode).toBe(1);
-    expect(result.stderr.toString()).toContain(
-      "standard.category must be mainnet, alt-l1, op-stack, nitro, zk, or alt-l2.",
-    );
-  } finally {
-    rmSync(fixture.root, { recursive: true, force: true });
-  }
-});
-
-test("generator rejects an unknown chain category", () => {
-  const fixture = createFixture({ categories: ["sidechain", "zk"] });
-  try {
-    const result = fixture.run();
-    expect(result.exitCode).toBe(1);
-    expect(result.stderr.toString()).toContain(
-      "standard.category must be mainnet, alt-l1, op-stack, nitro, zk, or alt-l2.",
-    );
-  } finally {
-    rmSync(fixture.root, { recursive: true, force: true });
+test("generator rejects a missing or unknown chain category", () => {
+  for (const category of [undefined, "sidechain"]) {
+    const fixture = createFixture({ categories: [category, "zk"] });
+    try {
+      const result = fixture.run();
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr.toString()).toContain(
+        "standard.category must be mainnet, alt-l1, op-stack, nitro, zk, or alt-l2.",
+      );
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
   }
 });
 

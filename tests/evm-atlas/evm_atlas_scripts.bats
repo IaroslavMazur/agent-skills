@@ -21,6 +21,7 @@ setup() {
     '#!/bin/bash' \
     'set -eu' \
     'printf "%s\\n" "$*" >> "$MOCK_CURL_LOG"' \
+    'case "$*" in *"-H @-"*) sed "s/^/stdin: /" >> "$MOCK_CURL_LOG" ;; esac' \
     'if [ "${MOCK_CURL_FAIL:-}" = "1" ]; then' \
     '  exit 22' \
     'fi' \
@@ -225,7 +226,8 @@ EOF
 
   [ "$status" -eq 0 ]
   [ "$output" = $'plan=builder\nrate_limit_rps=15\nrate_limit_remaining=9\nrate_limit_reset=42\ncredits_remaining=123' ]
-  [[ "$(<"$MOCK_CURL_LOG")" == *"authorization: Bearer test-key"* ]]
+  [ "$(sed -n 2p "$MOCK_CURL_LOG")" = "stdin: authorization: Bearer test-key" ]
+  [[ "$(sed -n 1p "$MOCK_CURL_LOG")" != *"test-key"* ]]
 }
 
 @test "Blockscout returns unknown for unrecognized or missing headers" {

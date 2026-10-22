@@ -142,8 +142,7 @@ the instructions change how a helper is used. Markdown changes always follow the
   writing. Complete its meaning and style review before finishing. Preserve obligation strength and protected technical
   content. This review does not establish official ASD dictionary compliance.
 - In this repository, an unqualified request to create, scaffold, or initialize a skill means an installable catalog
-  skill under `skills/<name>/`. Follow `@skill-lifecycle` and `@skill-authoring`. Do not use the project-local
-  scaffolding in `agents-brain create-skill` here.
+  skill under `skills/<name>/`. Do not use the project-local scaffolding in `agents-brain create-skill` here.
 - Create a repo-private internal skill under `.agents/internal-skills/<name>.md` only when the user explicitly requests
   an internal skill.
 - Run [`@rebase-skill`](.agents/internal-skills/rebase-skill.md) only when the user explicitly requests an upstream
