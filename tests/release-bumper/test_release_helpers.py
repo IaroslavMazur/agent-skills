@@ -92,6 +92,31 @@ class PlannerTests(unittest.TestCase):
             self.assertEqual([package["id"] for package in payload["packages"]], ["packages/app"])
             self.assertTrue(payload["needsSelection"])
 
+    def test_git_discovery_finds_nested_packages_and_skips_ignored_dirs(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            git(repo, "init", "-q", "-b", "main")
+            git(repo, "config", "user.name", "Test")
+            git(repo, "config", "user.email", "test@example.com")
+            (repo / "package.json").write_text('{"name":"root","workspaces":["packages/**"]}\n')
+            manifests = {
+                "packages/a": "a",
+                "packages/group/b": "b",
+                "packages/node_modules/vendored": "vendored",
+            }
+            for rel, name in manifests.items():
+                (repo / rel).mkdir(parents=True)
+                (repo / rel / "package.json").write_text(f'{{"name":"{name}","version":"1.0.0"}}\n')
+            git(repo, "add", "package.json", "packages/a", "packages/node_modules")
+            git(repo, "commit", "-qm", "initial")
+            # packages/group/b stays untracked; git discovery must still include it.
+
+            result = subprocess.run(
+                ["bun", "run", str(PLANNER), "--cwd", str(repo)], check=True, text=True, capture_output=True
+            )
+            payload = json.loads(result.stdout)
+            self.assertEqual([package["id"] for package in payload["packages"]], ["packages/a", "packages/group/b"])
+
     def test_changed_files_are_complete_and_hints_are_not_authoritative(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
