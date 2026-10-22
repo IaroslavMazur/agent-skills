@@ -52,8 +52,8 @@ Use `retained` when the current name is justified, `renamed` when the path or it
 when behavior or contract safety cannot be established. `excluded` and `blocked` require reasons.
 
 For delegated runs, have each subagent write a dispositions TSV outside the repository with one record per line:
-`status<TAB>repo-relative-path<TAB>reason`. The helper does not lock the ledger. From the coordinating session, apply
-each file in one batch, one file at a time:
+`status<TAB>repo-relative-path<TAB>reason`. Concurrent `mark` and `refresh` calls serialize on a sidecar
+`<scratch.json>.lock`. From the coordinating session, apply each file in one batch:
 
 ```sh
 uv run "<skill-dir>/scripts/naming-ledger.py" mark \

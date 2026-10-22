@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import subprocess
 import sys
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -76,6 +78,18 @@ def ensure_external_ledger(root: Path, ledger: Path) -> Path:
     except ValueError:
         return resolved
     raise LedgerError(f"ledger must be outside the repository: {resolved}")
+
+
+@contextmanager
+def exclusive(path: Path):
+    """Serialize read-modify-write cycles from concurrent callers on a sidecar lock."""
+    lock = path.with_name(f"{path.name}.lock")
+    with lock.open("a") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
 
 
 def atomic_write(path: Path, payload: dict[str, Any]) -> None:
@@ -371,7 +385,11 @@ def main() -> int:
     try:
         if getattr(args, "limit", 1) is not None and getattr(args, "limit", 1) < 1:
             raise LedgerError("--limit must be positive")
-        result = args.handler(args)
+        if args.command in ("mark", "refresh"):
+            with exclusive(args.ledger):
+                result = args.handler(args)
+        else:
+            result = args.handler(args)
     except LedgerError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 64

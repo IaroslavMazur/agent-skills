@@ -287,7 +287,6 @@ def new_coverage(codex_index_records: int) -> dict[str, Any]:
         "claude_candidates": 0,
         "selected_sessions": 0,
         "claude_tool_result_files": 0,
-        "claude_tool_result_failures": {},
         "codex_index_records": codex_index_records,
         "codex_scanned": 0,
         "claude_scanned": 0,

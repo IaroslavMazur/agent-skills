@@ -53,7 +53,7 @@ def normalize_projects(value: Any) -> list[str]:
 
 
 def load_yaml_text(args: argparse.Namespace) -> str:
-    local = args.input or args.fixture
+    local = args.input
     if local:
         try:
             return local.read_text(encoding="utf-8")
@@ -481,7 +481,6 @@ def build_parser() -> argparse.ArgumentParser:
     inspect.add_argument("--repo")
     inspect.add_argument("--template")
     inspect.add_argument("--input", type=Path)
-    inspect.add_argument("--fixture", type=Path, help=argparse.SUPPRESS)
     render = subparsers.add_parser("render")
     render.add_argument("--form", required=True, type=Path)
     render.add_argument("--answers", required=True, type=Path)

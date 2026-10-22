@@ -22,7 +22,7 @@ from unittest.mock import patch
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SKILL_ROOT = REPO_ROOT / "skills" / "yeet"
 SCRIPT = SKILL_ROOT / "scripts" / "issue-form.py"
-FIXTURE = SKILL_ROOT / "fixtures" / "issue-form.yml"
+FIXTURE = Path(__file__).resolve().parent / "issue-form.yml"
 SPEC = importlib.util.spec_from_file_location("issue_form", SCRIPT)
 assert SPEC and SPEC.loader
 MODULE = importlib.util.module_from_spec(SPEC)
@@ -273,7 +273,7 @@ body:
         self.assertTrue(body.endswith("`````\n"))
 
     def test_malformed_gh_responses_and_missing_executable_are_form_errors(self) -> None:
-        args = Namespace(input=None, fixture=None, repo="acme/demo", template="bug.yml")
+        args = Namespace(input=None, repo="acme/demo", template="bug.yml")
         with patch.object(MODULE.subprocess, "run", side_effect=FileNotFoundError):
             with self.assertRaisesRegex(MODULE.FormError, "gh executable not found"):
                 MODULE.load_yaml_text(args)
