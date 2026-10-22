@@ -164,8 +164,8 @@ export function groupSnapshotByRepo(snapshot: Snapshot): RepoLaneModel[] {
           const key = sessionKey(session.client, session.session_id);
           return {
             session,
-            work: workBySession.get(sessionKey(session.client, session.session_id)),
-            delegates: sessionRepo(session) === repoRoot ? (delegatesBySession.get(key) ?? []) : [],
+            work: workBySession.get(key),
+            delegates: delegatesBySession.get(key) ?? [],
           };
         });
       const unmatchedWork = work.filter(

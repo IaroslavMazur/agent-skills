@@ -9,6 +9,7 @@ export type BuildFreshness = {
 
 export const BUILD_INPUTS = [
   "src",
+  "public",
   "index.html",
   "vite.config.ts",
   "tsconfig.json",

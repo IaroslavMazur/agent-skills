@@ -81,7 +81,8 @@ export function subscribeToSnapshots(callbacks: SnapshotCallbacks): () => void {
         callbacks.onConnectionChange("polling");
       }
     } catch (error) {
-      if (stopped) {
+      // A poll that was in flight when SSE opened must not mark a live stream disconnected.
+      if (stopped || source.readyState === EventSource.OPEN) {
         return;
       }
       callbacks.onConnectionChange("disconnected");

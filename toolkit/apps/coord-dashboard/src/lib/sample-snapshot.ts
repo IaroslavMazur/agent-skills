@@ -1,7 +1,5 @@
 import type { Snapshot } from "@/lib/types.js";
 
-export const SAMPLE_NOW = 1_785_833_730;
-
 export const sampleSnapshot = {
   schema_version: 8,
   complete: false,

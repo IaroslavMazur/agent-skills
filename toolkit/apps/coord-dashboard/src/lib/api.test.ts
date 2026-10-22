@@ -502,6 +502,30 @@ describe("subscribeToSnapshots", () => {
     stop();
   });
 
+  test("ignores a polling failure that resolves after SSE opened", async () => {
+    const { promise: response, reject: rejectFetch } = Promise.withResolvers<Response>();
+    vi.stubGlobal("EventSource", FakeEventSource);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => response)
+    );
+    const onConnectionChange = vi.fn();
+    const onError = vi.fn();
+
+    const stop = subscribeToSnapshots({ onSnapshot: () => undefined, onConnectionChange, onError });
+    const source = FakeEventSource.instances[0];
+    if (!source) {
+      throw new Error("Expected an EventSource");
+    }
+    source.readyState = FakeEventSource.OPEN;
+    rejectFetch(new Error("network down"));
+    await flushPromises();
+
+    expect(onConnectionChange).not.toHaveBeenCalledWith("disconnected");
+    expect(onError).not.toHaveBeenCalled();
+    stop();
+  });
+
   test("aborts pending polling and ignores its response after cleanup", async () => {
     const { promise: response, resolve: resolveFetch } = Promise.withResolvers<Response>();
     const fetchMock = vi.fn<(...args: Parameters<typeof fetch>) => ReturnType<typeof fetch>>(
