@@ -312,3 +312,18 @@ test("rejects invalid addresses and a second start while a run is active", async
   expect(await first).toEqual({ queued: 1 });
   expect((await finish(page.api)).status).toMatchObject({ ok: 1 });
 });
+
+test("wait resolves with status when the run finishes, or at maxMs while it is still running", async () => {
+  const page = createPage({ [DOC.toLowerCase()]: { chains: [], usedChainsStatuses: [429] } });
+
+  expect(await page.api.wait(0)).toMatchObject({ running: false, total: 0 });
+  await expect(page.api.wait(Number.NaN)).rejects.toThrow("maxMs must be a non-negative number");
+
+  await page.api.start([DOC], { ...FAST, cooldownMs: 200 });
+  const early = await page.api.wait(10);
+  expect(early).toMatchObject({ running: true, pending: 1 });
+
+  const settled = Date.now();
+  expect(await page.api.wait(5000)).toMatchObject({ running: false, ok: 1, pending: 0 });
+  expect(Date.now() - settled).toBeLessThan(2000);
+});
