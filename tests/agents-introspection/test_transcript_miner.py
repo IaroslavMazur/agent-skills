@@ -671,6 +671,123 @@ class TranscriptMinerTests(unittest.TestCase):
         self.assertRegex(session["modified"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 
 
+    def test_codex_head_finds_metadata_after_noise_and_with_any_json_spacing(self) -> None:
+        project = self.fixture.project("alpha")
+        other = self.fixture.project("beta")
+        noise = [json.dumps(message_record("developer", f"noise {index}")) for index in range(5)]
+        spaced = json.dumps({"type": "session_meta", "payload": {"id": "late-meta", "cwd": str(project)}})
+        compact = json.dumps(
+            {"payload": {"id": "compact-meta", "cwd": str(project)}, "type": "session_meta"}, separators=(",", ":")
+        )
+        guardian = json.dumps(
+            {
+                "type": "session_meta",
+                "payload": {
+                    "id": "late-guardian",
+                    "cwd": str(project),
+                    "source": {"subagent": {"other": "guardian"}},
+                },
+            }
+        )
+        turn_only = json.dumps({"type": "turn_context", "payload": {"cwd": str(other)}})
+        user = json.dumps(message_record("user", "needle"))
+        sessions = self.fixture.codex_sessions
+        (sessions / "rollout-late-meta.jsonl").write_text("\n".join([*noise, spaced, user]) + "\n")
+        (sessions / "rollout-compact-meta.jsonl").write_text("\n".join([*noise, compact, user]) + "\n")
+        (sessions / "rollout-late-guardian.jsonl").write_text("\n".join([*noise, guardian, user]) + "\n")
+        (sessions / "rollout-turn-only.jsonl").write_text("\n".join([*noise, turn_only, user]) + "\n")
+
+        report = self.fixture.run([project, other], ["needle"], env_updates={"CODEX_THREAD_ID": "compact-meta"})
+        by_name = {Path(session["path"]).stem: session for session in report["candidate_sessions"]}
+
+        self.assertEqual(set(by_name), {"rollout-late-meta", "rollout-turn-only"})
+        self.assertEqual(by_name["rollout-late-meta"]["ownership"]["matched_via"], "session_meta.payload.cwd")
+        self.assertEqual(by_name["rollout-late-meta"]["project"], str(project))
+        self.assertEqual(by_name["rollout-turn-only"]["ownership"]["matched_via"], "turn_context.cwd")
+        self.assertEqual(by_name["rollout-turn-only"]["project"], str(other))
+        coverage = coverage_by_project(report)
+        self.assertEqual(coverage[project]["guardian_sessions_excluded"], 1)
+        self.assertEqual(coverage[project]["current_sessions_excluded"], 1)
+
+    def test_codex_head_flags_multiple_session_meta_cwds_after_noise_as_ambiguous(self) -> None:
+        project_a = self.fixture.project("alpha")
+        project_b = self.fixture.project("beta")
+        lines = [
+            json.dumps(message_record("developer", "noise")),
+            json.dumps({"type": "session_meta", "payload": {"id": "mixed", "cwd": str(project_a)}}),
+            json.dumps(message_record("developer", "noise")),
+            json.dumps({"type": "session_meta", "payload": {"id": "mixed", "cwd": str(project_b)}}),
+            json.dumps(message_record("user", "needle")),
+        ]
+        (self.fixture.codex_sessions / "rollout-mixed.jsonl").write_text("\n".join(lines) + "\n")
+
+        report = self.fixture.run([project_a, project_b], ["needle"])
+
+        self.assertEqual(report["candidate_sessions"], [])
+        coverage = coverage_by_project(report)
+        self.assertEqual(coverage[project_a]["ambiguous_ownership_excluded"], 1)
+        self.assertEqual(coverage[project_b]["ambiguous_ownership_excluded"], 1)
+
+    def test_codex_head_skips_malformed_and_blank_lines_and_keeps_the_record_window(self) -> None:
+        project = self.fixture.project("alpha")
+        meta = json.dumps({"type": "session_meta", "payload": {"id": "window", "cwd": str(project)}})
+        user = json.dumps(message_record("user", "needle"))
+        malformed = '{"type": "session_meta", "payload": {"id": "broken", "cwd": '
+        inside = [malformed, "", "not json", '{"type": "turn_context"', meta]
+        # Malformed and blank lines count toward the 100-line head window.
+        inside_window = [*inside, *[""] * 94, user]
+        self.assertEqual(inside_window.index(meta), 4)
+        (self.fixture.codex_sessions / "rollout-inside.jsonl").write_text("\n".join(inside_window) + "\n")
+        edge = [malformed, *[""] * 98, meta, user]
+        self.assertEqual(edge.index(meta), 99)
+        (self.fixture.codex_sessions / "rollout-edge.jsonl").write_text("\n".join(edge) + "\n")
+        outside = [malformed, *[""] * 99, meta, user]
+        self.assertEqual(outside.index(meta), 100)
+        (self.fixture.codex_sessions / "rollout-outside.jsonl").write_text("\n".join(outside) + "\n")
+
+        report = self.fixture.run([project], ["needle"])
+
+        names = {Path(session["path"]).stem for session in report["candidate_sessions"]}
+        self.assertEqual(names, {"rollout-inside", "rollout-edge"})
+
+    def test_codex_head_tolerates_invalid_utf8_in_skipped_lines(self) -> None:
+        project = self.fixture.project("alpha")
+        meta = json.dumps({"type": "session_meta", "payload": {"id": "bytes", "cwd": str(project)}})
+        user = json.dumps(message_record("user", "needle"))
+        path = self.fixture.codex_sessions / "rollout-bytes.jsonl"
+        path.write_bytes(b'{"type":"noise","text":"\xff\xfe"}\n' + b'{"type":"session_meta","x":"\xff"}\n'
+                         + meta.encode() + b"\n" + user.encode() + b"\n")
+
+        report = self.fixture.run([project], ["needle"])
+
+        self.assertEqual([Path(session["path"]).stem for session in report["candidate_sessions"]], ["rollout-bytes"])
+
+    def test_single_project_run_counts_no_content_only_mentions(self) -> None:
+        project = self.fixture.project("alpha")
+        self.fixture.codex_session("solo", project, user=f"needle in {project}")
+        self.fixture.codex_session("solo-body", project, user="plain", assistant=f"needle in {project}")
+
+        report = self.fixture.run([project], ["needle"])
+
+        self.assertEqual(len(report["candidate_sessions"]), 2)
+        coverage = coverage_by_project(report)[project]
+        self.assertEqual(coverage["content_only_project_mentions_ignored"], 0)
+        self.assertEqual(coverage["structurally_matched"], 2)
+
+    def test_keyword_free_single_project_run_walks_records_only_for_foreign_projects(self) -> None:
+        project_a = self.fixture.project("alpha")
+        project_b = self.fixture.project("beta")
+        self.fixture.codex_session("own", project_a, user=f"see {project_a}")
+        self.fixture.codex_session("mentions", project_a, user=f"compare {project_b}")
+
+        report = self.fixture.run([project_a, project_b], [])
+
+        coverage = coverage_by_project(report)
+        self.assertEqual(coverage[project_b]["content_only_project_mentions_ignored"], 1)
+        self.assertEqual(coverage[project_a]["content_only_project_mentions_ignored"], 0)
+        self.assertEqual(coverage[project_a]["structurally_matched"], 2)
+
+
 def message_record(role: str, text: str) -> dict[str, Any]:
     content_type = "input_text" if role in {"user", "developer", "system"} else "output_text"
     return {
