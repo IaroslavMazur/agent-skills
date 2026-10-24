@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.0] - 2026-10-24
+
+### Added
+
+- Add `PUSH_SKIPPED <branch> no-remote` for repositories with no branch remote or named remotes, preserving local commit receipts without a pending push ([`71c1b82`](https://github.com/PaulRBerg/agent-skills/commit/71c1b82fa01a850b05cff9a1e1261864b7695265))
+
 ## [1.0.3] - 2026-10-22
 
 ### Fixed
@@ -23,6 +29,7 @@
 
 _First release._
 
+[1.1.0]: https://github.com/PaulRBerg/agent-skills/releases/tag/ai-commit-v1.1.0
 [1.0.3]: https://github.com/PaulRBerg/agent-skills/releases/tag/ai-commit-v1.0.3
 [1.0.2]: https://github.com/PaulRBerg/agent-skills/releases/tag/ai-commit-v1.0.2
 [1.0.1]: https://github.com/PaulRBerg/agent-skills/releases/tag/ai-commit-v1.0.1
