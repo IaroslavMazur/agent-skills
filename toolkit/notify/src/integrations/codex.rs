@@ -3,7 +3,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use serde_json::Value as JsonValue;
 use toml_edit::{Array, DocumentMut, Item, Value};
 
 use crate::{
@@ -11,7 +10,7 @@ use crate::{
     error::{AppError, Result},
 };
 
-use super::IntegrationStatus;
+use super::{IntegrationStatus, codex_hooks::inspect_codex_hooks};
 
 /// The callback command installed in Codex's root `notify` key.
 pub const CODEX_NOTIFY_COMMAND: &[&str] = &["ai-notify", "codex"];
@@ -55,6 +54,8 @@ pub struct CodexHooksReport {
     pub path: PathBuf,
     pub installed_events: Vec<String>,
     pub missing_events: Vec<String>,
+    pub optional_installed_events: Vec<String>,
+    pub optional_missing_events: Vec<String>,
     pub error: Option<String>,
 }
 
@@ -242,56 +243,6 @@ pub fn inspect_codex_integration(config_root: &Path, profile: Option<&str>) -> C
         _ => IntegrationStatus::Partial,
     };
     CodexIntegrationReport { status, hooks, notify }
-}
-
-/// Inspect `hooks.json` for native hook handlers that run `ai-notify event codex`.
-fn inspect_codex_hooks(config_root: &Path) -> CodexHooksReport {
-    let path = config_root.join("hooks.json");
-    let (installed_events, error) = match codex_hook_events(&path) {
-        Ok(events) => (events, None),
-        Err(error) => (Vec::new(), Some(error.message)),
-    };
-    let missing_events = CODEX_HOOK_EVENTS
-        .iter()
-        .filter(|event| !installed_events.iter().any(|installed| installed == *event))
-        .map(|event| (*event).to_owned())
-        .collect();
-    CodexHooksReport { path, installed_events, missing_events, error }
-}
-
-fn codex_hook_events(path: &Path) -> Result<Vec<String>> {
-    if !path.exists() {
-        return Ok(Vec::new());
-    }
-    let text = fs::read_to_string(path)?;
-    let data: JsonValue = serde_json::from_str(&text)
-        .map_err(|error| AppError::integration(format!("failed to parse {}: {error}", path.display())))?;
-    let Some(root) = data.as_object() else {
-        return Err(AppError::integration(format!("{} must contain a JSON object at the root", path.display())));
-    };
-    let Some(hooks) = root.get("hooks") else {
-        return Ok(Vec::new());
-    };
-    let Some(hooks) = hooks.as_object() else {
-        return Err(AppError::integration(format!("{}: hooks field must be an object", path.display())));
-    };
-    Ok(CODEX_HOOK_EVENTS
-        .iter()
-        .filter(|event| hooks.get(**event).is_some_and(groups_run_codex_hook))
-        .map(|event| (*event).to_owned())
-        .collect())
-}
-
-/// Codex ignores matchers for `UserPromptSubmit` and `Stop`, so any matcher group counts.
-fn groups_run_codex_hook(groups: &JsonValue) -> bool {
-    groups.as_array().into_iter().flatten().any(|group| {
-        group.get("hooks").and_then(JsonValue::as_array).into_iter().flatten().any(|hook| {
-            hook.get("type").and_then(JsonValue::as_str) == Some("command") &&
-                hook.get("command").and_then(JsonValue::as_str).is_some_and(|command| {
-                    crate::cli::codex_hook_argv_runs(&command.split_whitespace().collect::<Vec<_>>())
-                })
-        })
-    })
 }
 
 fn load_document(path: &Path) -> Result<DocumentMut> {

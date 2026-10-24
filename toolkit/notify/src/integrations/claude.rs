@@ -26,6 +26,7 @@ pub const HOOK_SPECS: &[HookSpec] = &[
     HookSpec { event: "UserPromptSubmit", command: "ai-notify event user-prompt-submit", matcher: None },
     HookSpec { event: "Stop", command: "ai-notify event stop", matcher: None },
     HookSpec { event: "StopFailure", command: "ai-notify event stop-failure", matcher: None },
+    HookSpec { event: "Elicitation", command: "ai-notify event elicitation", matcher: None },
     HookSpec { event: "Notification", command: "ai-notify event notification", matcher: None },
     HookSpec { event: "PermissionRequest", command: "ai-notify event permission-request", matcher: None },
     HookSpec { event: "PreToolUse", command: "ai-notify event ask-user-question", matcher: Some("AskUserQuestion") },

@@ -20,7 +20,8 @@ use crate::{
     },
     model::Client,
     notifier::{
-        NotificationSink, completion_notification, failure_notification, permission_notification, question_notification,
+        NotificationSink, completion_notification, failure_notification, input_notification, permission_notification,
+        question_notification,
     },
 };
 
@@ -148,20 +149,69 @@ pub fn handle_stop_failure(
     Ok(())
 }
 
-/// Tracks Claude's waiting state without issuing a duplicate notification.
-pub fn handle_notification(payload: &Value, state: &impl SessionState) -> Result<()> {
+/// Tracks Claude's waiting state and alerts only for actionable notification types.
+pub fn handle_notification(
+    payload: &Value,
+    state: &impl SessionState,
+    config: &AppConfig,
+    notifier: &mut impl NotificationSink,
+) -> Result<()> {
     validate_payload(payload)?;
     let object = object(payload)?;
     let session_id = required_session_id(object)?;
     let message = string(object, "message");
     let notification_type = string(object, "notification_type");
-    if notification_type == "idle_prompt" ||
+    let fallback = match notification_type {
+        "agent_needs_input" => Some("Claude needs your input"),
+        "quota_auto_resume_stale" => Some("Quota auto-resume needs attention"),
+        "quota_auto_resume_disabled" => Some("Quota auto-resume is disabled"),
+        _ => None,
+    };
+    if fallback.is_some() ||
+        notification_type == "idle_prompt" ||
         ["waiting for input", "waiting for user", "approval needed"]
             .iter()
             .any(|keyword| message.to_ascii_lowercase().contains(keyword))
     {
         state.mark_waiting(session_id);
     }
+    if let Some(fallback) = fallback &&
+        should_send_permission_notification(config)
+    {
+        let detail = [message, string(object, "title")]
+            .into_iter()
+            .map(str::trim)
+            .find(|value| !value.is_empty())
+            .unwrap_or(fallback);
+        let notification = input_notification(
+            &project_name(string(object, "cwd")),
+            &state.active_prompt(session_id).unwrap_or_default(),
+            detail,
+        );
+        let _ = notifier.deliver(&notification);
+    }
+    Ok(())
+}
+
+/// Observes an MCP input request without exposing its URL, schema, or authorization fields.
+pub fn handle_elicitation(
+    payload: &Value,
+    state: &impl SessionState,
+    config: &AppConfig,
+    notifier: &mut impl NotificationSink,
+) -> Result<()> {
+    validate_payload(payload)?;
+    if !should_send_permission_notification(config) {
+        return Ok(());
+    }
+    let object = object(payload)?;
+    let task = optional_session_id(object).and_then(|session_id| state.active_prompt(session_id)).unwrap_or_default();
+    let server = string(object, "mcp_server_name").trim();
+    let message = string(object, "message").trim();
+    let message = if message.is_empty() { "Input requested" } else { message };
+    let detail = if server.is_empty() { message.to_owned() } else { format!("{server} — {message}") };
+    let notification = input_notification(&project_name(string(object, "cwd")), &task, &detail);
+    let _ = notifier.deliver(&notification);
     Ok(())
 }
 
@@ -179,6 +229,7 @@ pub fn handle_permission(
     let object = object(payload)?;
     let task = optional_session_id(object).and_then(|session_id| state.active_prompt(session_id)).unwrap_or_default();
     let notification = permission_notification(
+        Client::Claude,
         project_name(string(object, "cwd")).as_str(),
         &task,
         &permission_request(object.get("tool_name"), object.get("tool_input")),
@@ -201,6 +252,7 @@ pub fn handle_ask_user_question(
     let object = object(payload)?;
     let task = optional_session_id(object).and_then(|session_id| state.active_prompt(session_id)).unwrap_or_default();
     let notification = question_notification(
+        Client::Claude,
         project_name(string(object, "cwd")).as_str(),
         &task,
         &question_text(object.get("tool_input")),
@@ -209,7 +261,7 @@ pub fn handle_ask_user_question(
     Ok(())
 }
 
-/// Tracks native Codex prompts and notifies on Stop without a duration threshold.
+/// Tracks native Codex turns and emits completion or attention notifications.
 pub fn handle_codex_hook(
     payload: &Value,
     state: &impl SessionState,
@@ -251,7 +303,39 @@ pub fn handle_codex_hook(
             }
             state.cleanup_if_due();
         }
-        _ => return Err(AppError::hook_payload("Codex hook must be UserPromptSubmit or Stop")),
+        "PermissionRequest" if should_send_permission_notification(config) => {
+            let notification = permission_notification(
+                Client::Codex,
+                &project_name(string(object, "cwd")),
+                &state.active_prompt(&key).unwrap_or_default(),
+                &permission_request(object.get("tool_name"), object.get("tool_input")),
+            );
+            let _ = notifier.deliver(&notification);
+        }
+        "PreToolUse"
+            if string(object, "tool_name") == "request_user_input" && should_send_permission_notification(config) =>
+        {
+            if let Some(question) = nonempty_question_text(object.get("tool_input")) {
+                let notification = question_notification(
+                    Client::Codex,
+                    &project_name(string(object, "cwd")),
+                    &state.active_prompt(&key).unwrap_or_default(),
+                    &question,
+                );
+                let _ = notifier.deliver(&notification);
+            }
+        }
+        "PermissionRequest" | "PreToolUse" => {}
+        "Interrupt" => {
+            if state.active_prompt(&key).is_some() {
+                state.mark_stopped(&key);
+            }
+        }
+        _ => {
+            return Err(AppError::hook_payload(
+                "Codex hook must be UserPromptSubmit, Stop, PermissionRequest, PreToolUse, or Interrupt",
+            ));
+        }
     }
     Ok(())
 }
@@ -325,20 +409,20 @@ pub fn permission_request(tool_name: Option<&Value>, tool_input: Option<&Value>)
 }
 
 pub fn question_text(tool_input: Option<&Value>) -> String {
-    let Some(questions) =
-        tool_input.and_then(Value::as_object).and_then(|input| input.get("questions")).and_then(Value::as_array)
-    else {
-        return DEFAULT_QUESTION.to_owned();
-    };
+    nonempty_question_text(tool_input).unwrap_or_else(|| DEFAULT_QUESTION.to_owned())
+}
+
+fn nonempty_question_text(tool_input: Option<&Value>) -> Option<String> {
+    let questions = tool_input?.as_object()?.get("questions")?.as_array()?;
     let questions = questions
         .iter()
         .filter_map(|question| question.as_object().map(|value| string(value, "question").trim()))
         .filter(|question| !question.is_empty())
         .collect::<Vec<_>>();
     match questions.first() {
-        None => DEFAULT_QUESTION.to_owned(),
-        Some(first) if questions.len() == 1 => (*first).to_owned(),
-        Some(first) => format!("{first} (+{} more)", questions.len() - 1),
+        None => None,
+        Some(first) if questions.len() == 1 => Some((*first).to_owned()),
+        Some(first) => Some(format!("{first} (+{} more)", questions.len() - 1)),
     }
 }
 
@@ -459,269 +543,4 @@ fn strip_terminal_controls(value: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use std::cell::RefCell;
-
-    use serde_json::json;
-
-    use crate::{config::NotificationConfig, model::Notification};
-
-    use super::*;
-
-    #[derive(Default)]
-    struct State {
-        prompts: RefCell<Vec<String>>,
-        stopped: RefCell<Vec<String>>,
-        waiting: RefCell<Vec<String>>,
-        active: Option<String>,
-        job: JobInfo,
-    }
-    impl SessionState for State {
-        fn track_prompt(&self, session: &str, prompt: &str, _: &str) {
-            self.prompts.borrow_mut().push(format!("{session}:{prompt}"));
-        }
-        fn mark_stopped(&self, session: &str) {
-            self.stopped.borrow_mut().push(session.into());
-        }
-        fn mark_waiting(&self, session: &str) {
-            self.waiting.borrow_mut().push(session.into());
-        }
-        fn active_prompt(&self, _: &str) -> Option<String> {
-            self.active.clone()
-        }
-        fn job_info(&self, _: &str) -> JobInfo {
-            self.job.clone()
-        }
-        fn cleanup_if_due(&self) {}
-    }
-    #[derive(Default)]
-    struct Sink(RefCell<Vec<Notification>>);
-    impl NotificationSink for Sink {
-        fn deliver(&mut self, notification: &Notification) -> bool {
-            self.0.borrow_mut().push(notification.clone());
-            true
-        }
-    }
-    fn config() -> AppConfig {
-        AppConfig {
-            notification: NotificationConfig { threshold_seconds: 10, ..Default::default() },
-            ..Default::default()
-        }
-    }
-
-    #[test]
-    fn validation_rejects_invalid_generic_payload_fields() {
-        assert!(validate_payload(&json!({"cwd":"/tmp/../etc"})).is_err());
-        assert!(validate_payload(&json!({"cwd":"/tmp/project..next"})).is_ok());
-        assert!(validate_payload(&json!({"session_id":""})).is_err());
-        assert!(parse_payload("[]").is_err());
-    }
-    #[test]
-    fn user_prompt_tracks_intent_but_ignores_internal_envelopes() {
-        let state = State::default();
-        handle_user_prompt(&json!({"session_id":"s", "prompt":"<task-notification>done", "cwd":"/tmp/p"}), &state)
-            .unwrap();
-        handle_user_prompt(&json!({"session_id":"s", "prompt":"fix this", "cwd":"/tmp/p"}), &state).unwrap();
-        assert_eq!(*state.prompts.borrow(), ["s:fix this"]);
-    }
-    #[test]
-    fn stop_defers_pending_work_and_filters_normal_completions() {
-        let state = State {
-            active: Some("work".into()),
-            job: JobInfo { job_number: Some(1), duration_seconds: Some(11), prompt: Some("work".into()) },
-            ..Default::default()
-        };
-        let mut sink = Sink::default();
-        handle_stop(&json!({"session_id":"s", "background_tasks":[{}]}), &state, &config(), &mut sink).unwrap();
-        assert!(state.stopped.borrow().is_empty());
-        handle_stop(
-            &json!({"session_id":"s", "cwd":"/tmp/project", "last_assistant_message":"done"}),
-            &state,
-            &config(),
-            &mut sink,
-        )
-        .unwrap();
-        assert_eq!(sink.0.borrow()[0].subtitle, "Claude completed in 11s");
-    }
-    #[test]
-    fn stop_without_an_active_turn_does_not_repeat_a_previous_completion() {
-        let state = State {
-            job: JobInfo { job_number: Some(1), duration_seconds: Some(11), prompt: Some("previous work".into()) },
-            ..Default::default()
-        };
-        let mut sink = Sink::default();
-
-        handle_stop(&json!({"session_id":"s"}), &state, &config(), &mut sink).unwrap();
-
-        assert!(sink.0.borrow().is_empty());
-    }
-    #[test]
-    fn failure_bypasses_duration_and_prefix_filters_but_requires_all() {
-        let state = State {
-            active: Some("/skip work".into()),
-            job: JobInfo { job_number: Some(1), duration_seconds: Some(1), prompt: Some("/skip work".into()) },
-            ..Default::default()
-        };
-        let mut sink = Sink::default();
-        let config = AppConfig {
-            notification: NotificationConfig {
-                threshold_seconds: 999,
-                exclude_patterns: vec!["/skip".into()],
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        handle_stop_failure(&json!({"session_id":"s", "error":"nope"}), &state, &config, &mut sink).unwrap();
-        assert_eq!(sink.0.borrow()[0].message, "Task: /skip work\nError: nope");
-    }
-    #[test]
-    fn idle_permission_and_question_contracts_are_preserved() {
-        let state = State { active: Some("task".into()), ..Default::default() };
-        let mut sink = Sink::default();
-        handle_notification(&json!({"session_id":"s", "notification_type":"idle_prompt"}), &state).unwrap();
-        handle_permission(
-            &json!({"session_id":"s", "tool_name":"Bash", "tool_input":{"command":"ls"}}),
-            &state,
-            &config(),
-            &mut sink,
-        )
-        .unwrap();
-        handle_ask_user_question(
-            &json!({"session_id":"s", "tool_input":{"questions":[{"question":"Continue?"},{"question":"Why?"}]}}),
-            &state,
-            &config(),
-            &mut sink,
-        )
-        .unwrap();
-        assert_eq!(*state.waiting.borrow(), ["s"]);
-        assert_eq!(sink.0.borrow()[0].message, "Task: task\nRequest: Bash — ls");
-        assert_eq!(sink.0.borrow()[1].message, "Task: task\nQuestion: Continue? (+1 more)");
-    }
-    #[test]
-    fn codex_aliases_choose_last_user_message_and_have_no_duration_filter() {
-        let mut sink = Sink::default();
-        handle_codex_notify(&json!({"event":"agent-turn-complete", "cwd":"/tmp/p", "inputMessages":[{"role":"user", "content":[{"text":"first"}]},{"role":"user", "content":"last"}], "lastAssistantMessage":{"content":"done"}}), &config(), &mut sink).unwrap();
-        assert_eq!(sink.0.borrow()[0].message, "Task: last\nResult: done");
-    }
-
-    #[test]
-    fn native_codex_hooks_keep_latest_prompt_and_notify_once_per_turn() {
-        let directory = tempfile::tempdir().unwrap();
-        let mut config = config();
-        config.database.path = directory.path().join("sessions.db");
-        config.cleanup.auto_cleanup_enabled = false;
-        config.notification.threshold_seconds = u64::MAX;
-        let state = crate::state::SessionStore::new(&config).unwrap();
-        let mut sink = Sink::default();
-        for prompt in ["first request", "latest request"] {
-            handle_codex_hook(
-                &json!({"hook_event_name":"UserPromptSubmit", "session_id":"s", "turn_id":"t", "prompt":prompt}),
-                &state,
-                &config,
-                &mut sink,
-            )
-            .unwrap();
-        }
-        assert!(sink.0.borrow().is_empty());
-        let stop = json!({"hook_event_name":"Stop", "session_id":"s", "turn_id":"t", "cwd":"/tmp/project", "last_assistant_message":"done"});
-        handle_codex_hook(&stop, &state, &config, &mut sink).unwrap();
-        handle_codex_hook(&stop, &state, &config, &mut sink).unwrap();
-        let notifications = sink.0.borrow();
-        assert_eq!(notifications.len(), 1);
-        assert_eq!(notifications[0].message, "Task: latest request\nResult: done");
-        assert_eq!(notifications[0].subtitle, "Codex completed");
-    }
-
-    #[test]
-    fn native_codex_stop_preserves_modes_and_prompt_exclusions() {
-        let stop = json!({"hook_event_name":"Stop", "session_id":"s", "turn_id":"t", "last_assistant_message":"done"});
-        for (mode, prompt) in [
-            (crate::model::NotificationMode::All, "/skip this"),
-            (crate::model::NotificationMode::PermissionOnly, "work"),
-            (crate::model::NotificationMode::Disabled, "work"),
-        ] {
-            let mut config = config();
-            config.notification.mode = mode;
-            config.notification.exclude_patterns = vec!["/skip".into()];
-            let state = State { active: Some(prompt.into()), ..Default::default() };
-            let mut sink = Sink::default();
-            handle_codex_hook(&stop, &state, &config, &mut sink).unwrap();
-            assert!(sink.0.borrow().is_empty());
-            assert_eq!(*state.stopped.borrow(), ["codex:s:t"]);
-        }
-    }
-
-    #[test]
-    fn native_codex_stop_without_prompt_state_still_reports_the_result() {
-        let state = State::default();
-        let mut sink = Sink::default();
-        let mut stop =
-            json!({"hook_event_name":"Stop", "session_id":"s", "turn_id":"t", "last_assistant_message":null});
-        handle_codex_hook(&stop, &state, &config(), &mut sink).unwrap();
-        assert_eq!(sink.0.borrow()[0].message, "Result: Turn completed.");
-        stop["last_assistant_message"] = json!(42);
-        assert!(handle_codex_hook(&stop, &state, &config(), &mut sink).is_err());
-        stop["turn_id"] = json!("");
-        assert!(handle_codex_hook(&stop, &state, &config(), &mut sink).is_err());
-    }
-
-    // Codex 0.155.1: tui/src/app/thread_title.rs::thread_title_instructions.
-    const CODEX_TITLE_INSTRUCTIONS: &str = "Generate a concise, single-line task title of at most \
-        36 characters and under five words where possible. Start with an imperative verb. \
-        Capitalize only the first word unless the user's language, proper nouns, acronyms, or code terms \
-        require otherwise. Preserve ticket references exactly. Write in the user's language. \
-        Do not use quotes, markdown, or trailing punctuation. Do not answer the request.";
-
-    #[test]
-    fn codex_internal_title_and_rename_turns_do_not_notify() {
-        for context in [
-            "\n\nUser prompt:\nFix the failing tests",
-            "\nPrioritize the current task and latest substantive user request.\n\n\
-             Recent conversation messages:\n<conversation>\n\
-             <message role=\"user\">Fix the failing tests</message>\n</conversation>",
-        ] {
-            let mut sink = Sink::default();
-            handle_codex_notify(
-                &json!({
-                    "type": "agent-turn-complete",
-                    "client": "codex-tui",
-                    "input-messages": [format!("{CODEX_TITLE_INSTRUCTIONS}{context}")],
-                    "last-assistant-message": "{\"title\":\"Fix failing tests\"}",
-                }),
-                &config(),
-                &mut sink,
-            )
-            .unwrap();
-            assert!(sink.0.borrow().is_empty(), "internal title context: {context}");
-        }
-    }
-
-    #[test]
-    fn codex_real_title_requests_and_quoted_internal_prompts_still_notify() {
-        for prompt in [
-            "Generate a title for my article".to_owned(),
-            CODEX_TITLE_INSTRUCTIONS.to_owned(),
-            format!("Explain this internal prompt: {CODEX_TITLE_INSTRUCTIONS}\n\nUser prompt:\nFix tests"),
-        ] {
-            let mut sink = Sink::default();
-            handle_codex_notify(
-                &json!({
-                    "type": "agent-turn-complete",
-                    "input-messages": [prompt],
-                    "last-assistant-message": "{\"title\":\"Fix failing tests\"}",
-                }),
-                &config(),
-                &mut sink,
-            )
-            .unwrap();
-            assert_eq!(sink.0.borrow().len(), 1, "user prompt: {prompt}");
-        }
-    }
-
-    #[test]
-    fn duration_and_text_extractors_keep_historical_behavior() {
-        assert_eq!(format_duration(3661), "1h1m");
-        assert_eq!(failure_message(json!({"error_details":" a\n b "}).as_object().unwrap()), "a b");
-        assert_eq!(extract_message_text(Some(&json!([{"text":"a"}, {"content":"b"}]))), "a b");
-    }
-}
+mod tests;

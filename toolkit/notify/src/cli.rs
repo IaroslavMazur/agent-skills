@@ -14,8 +14,8 @@ use crate::{
     error::{AppError, Result},
     events,
     integrations::{
-        CODEX_NOTIFY_COMMAND, IntegrationStatus, ensure_claude_hooks, inspect_claude_hooks, inspect_codex_integration,
-        set_codex_notify,
+        CODEX_NOTIFY_COMMAND, IntegrationStatus, ensure_claude_hooks, ensure_codex_hooks, inspect_claude_hooks,
+        inspect_codex_integration, set_codex_notify,
     },
     logging,
     model::Client,
@@ -113,6 +113,15 @@ pub enum LinkCommand {
         #[arg(long)]
         dry_run: bool,
     },
+    /// Merge passive native Codex hooks; review and trust them separately through /hooks.
+    CodexHooks {
+        /// hooks.json path (defaults to $CODEX_HOME/hooks.json or ~/.codex/hooks.json).
+        #[arg(long)]
+        path: Option<PathBuf>,
+        /// Show the update without writing it.
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// Configure Codex CLI's notify callback.
     Codex {
         /// Codex config.toml path (defaults to ~/.codex/config.toml).
@@ -129,12 +138,13 @@ pub enum LinkCommand {
 
 #[derive(Clone, Copy, Debug, Subcommand)]
 pub enum EventCommand {
-    /// Handle native Codex UserPromptSubmit and Stop hooks from stdin.
+    /// Handle native Codex UserPromptSubmit, Stop, PermissionRequest, PreToolUse, and Interrupt hooks from stdin.
     Codex,
     UserPromptSubmit,
     Stop,
     StopFailure,
     Notification,
+    Elicitation,
     PermissionRequest,
     AskUserQuestion,
 }
@@ -357,6 +367,32 @@ fn run_link(command: LinkCommand) -> Result<()> {
             }
             Ok(())
         }
+        LinkCommand::CodexHooks { path, dry_run } => {
+            let path = path.map_or_else(|| codex_root().map(|root| root.join("hooks.json")), Ok)?;
+            let update = ensure_codex_hooks(&path, dry_run)?;
+            if dry_run {
+                println!("DRY RUN - {}", update.path.display());
+            }
+            if update.added.is_empty() && update.consolidated.is_empty() {
+                println!("Hooks already set in {}", update.path.display());
+            } else {
+                println!("{} hooks in {}", if dry_run { "Would update" } else { "Updated" }, update.path.display());
+            }
+            if !update.added.is_empty() {
+                println!("Added events: {}", update.added.join(", "));
+            }
+            if !update.consolidated.is_empty() {
+                println!("Consolidated events: {}", update.consolidated.join(", "));
+            }
+            println!(
+                "Review and trust new or changed definitions through Codex /hooks; static definitions do not prove hooks are enabled or trusted."
+            );
+            println!(
+                "Avoid duplicate alerts: remove only ai-notify from the legacy notify callback. Preserve a Codex Desktop wrapper and remove only its ai-notify --previous-notify forwarding arguments."
+            );
+            println!("Run ai-notify check to inspect possible duplicate native and legacy completion setup.");
+            Ok(())
+        }
         LinkCommand::Codex { path, profile, force } => {
             let path = path.map_or_else(|| home_path(".codex/config.toml"), Ok)?;
             let update = set_codex_notify(&path, CODEX_NOTIFY_COMMAND, profile.as_deref(), force)?;
@@ -384,7 +420,7 @@ fn run_link(command: LinkCommand) -> Result<()> {
 
 fn check_integrations(profile: Option<&str>) -> Result<()> {
     let claude_root = home_path(".claude")?;
-    let codex_root = home_path(".codex")?;
+    let codex_root = codex_root()?;
     let project_root = env::current_dir()?;
     let claude = inspect_claude_hooks(&claude_root, &project_root);
     let codex = inspect_codex_integration(&codex_root, profile);
@@ -418,16 +454,42 @@ fn check_integrations(profile: Option<&str>) -> Result<()> {
     println!("{label}: {}", status_label(codex.status));
     let hooks = &codex.hooks;
     let notify = &codex.notify;
-    let hooks_contribute = !hooks.installed_events.is_empty();
+    let hooks_contribute = !hooks.installed_events.is_empty() || !hooks.optional_installed_events.is_empty();
     let notify_contributes = notify.status == IntegrationStatus::Ok;
     if hooks_contribute || notify_contributes {
         println!("  Contributing sources:");
         if hooks_contribute {
-            println!("    - {} (native hooks: {})", display_path(&hooks.path), hooks.installed_events.join(", "));
+            let events =
+                hooks.installed_events.iter().chain(&hooks.optional_installed_events).cloned().collect::<Vec<_>>();
+            println!("    - {} (native hooks: {})", display_path(&hooks.path), events.join(", "));
         }
         if let Some(path) = notify.path.as_ref().filter(|_| notify_contributes) {
             println!("    - {} (legacy notify)", display_path(path));
         }
+    }
+    println!(
+        "  Native optional attention/lifecycle coverage: {}",
+        if hooks.error.is_some() {
+            "UNKNOWN"
+        } else if hooks.optional_missing_events.is_empty() {
+            "COMPLETE"
+        } else {
+            "INCOMPLETE"
+        }
+    );
+    if !hooks.optional_installed_events.is_empty() {
+        println!("  Present optional native hook events: {}", hooks.optional_installed_events.join(", "));
+    }
+    if !hooks.optional_missing_events.is_empty() {
+        println!("  Missing optional native hook events: {}", hooks.optional_missing_events.join(", "));
+    }
+    println!(
+        "  Native inspection checks only user hooks.json definitions; enabled state and trust are unverified. Inline and project hooks are not inspected. Review /hooks in Codex."
+    );
+    if hooks.installed_events.iter().any(|event| event == "Stop") && notify_contributes {
+        println!(
+            "  Possible duplicate completion setup: native Stop and legacy notify both run ai-notify. Preserve any Codex Desktop wrapper when removing ai-notify forwarding."
+        );
     }
     if hooks_contribute && !hooks.missing_events.is_empty() {
         println!("  Missing native hook events: {}", hooks.missing_events.join(", "));
@@ -503,7 +565,8 @@ fn run_event(event: EventCommand, config: &AppConfig) -> Result<()> {
         EventCommand::UserPromptSubmit => events::handle_user_prompt(&payload, &state),
         EventCommand::Stop => events::handle_stop(&payload, &state, config, &mut notifier),
         EventCommand::StopFailure => events::handle_stop_failure(&payload, &state, config, &mut notifier),
-        EventCommand::Notification => events::handle_notification(&payload, &state),
+        EventCommand::Notification => events::handle_notification(&payload, &state, config, &mut notifier),
+        EventCommand::Elicitation => events::handle_elicitation(&payload, &state, config, &mut notifier),
         EventCommand::PermissionRequest => events::handle_permission(&payload, &state, config, &mut notifier),
         EventCommand::AskUserQuestion => events::handle_ask_user_question(&payload, &state, config, &mut notifier),
     }
@@ -556,6 +619,12 @@ fn display_path(path: &Path) -> String {
                 if relative.as_os_str().is_empty() { "~".to_owned() } else { format!("~/{}", relative.display()) }
             },
         )
+}
+
+fn codex_root() -> Result<PathBuf> {
+    env::var_os("CODEX_HOME")
+        .filter(|value| !value.is_empty())
+        .map_or_else(|| home_path(".codex"), |value| Ok(PathBuf::from(value)))
 }
 
 fn home_path(relative: &str) -> Result<PathBuf> {

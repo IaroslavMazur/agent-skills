@@ -2,6 +2,7 @@
 
 mod claude;
 mod codex;
+mod codex_hooks;
 
 pub use claude::{
     ClaudeHooksReport, ClaudeHooksUpdate, HOOK_SPECS, HookSpec, ensure_claude_hooks, inspect_claude_hooks,
@@ -11,6 +12,8 @@ pub use codex::{
     CodexNotifyUpdate, inspect_codex_integration, inspect_codex_notify, resolve_codex_config_path, set_codex_notify,
     validate_codex_profile_name,
 };
+
+pub use codex_hooks::{CODEX_HOOK_SPECS, CodexHookSpec, CodexHooksUpdate, ensure_codex_hooks};
 
 /// The state of one integration as observed by an inspector.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

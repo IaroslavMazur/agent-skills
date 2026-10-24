@@ -197,11 +197,11 @@ pub fn completion_notification(
     )
 }
 
-pub fn permission_notification(project: &str, task: &str, request: &str) -> Notification {
+pub fn permission_notification(client: Client, project: &str, task: &str, request: &str) -> Notification {
     Notification::new(
-        Client::Claude,
-        if project.is_empty() { "Claude Code" } else { project },
-        "Claude needs approval",
+        client,
+        notification_title(client, project),
+        format!("{} needs approval", client.display_name()),
         context_message(task, "Request", if request.is_empty() { "Permission requested" } else { request }),
     )
 }
@@ -220,13 +220,41 @@ pub fn failure_notification(project: &str, task: &str, error: &str, duration: Op
     )
 }
 
-pub fn question_notification(project: &str, task: &str, question: &str) -> Notification {
+pub fn question_notification(client: Client, project: &str, task: &str, question: &str) -> Notification {
+    let question = if !question.is_empty() {
+        question
+    } else {
+        match client {
+            Client::Claude => "Claude is asking a question",
+            Client::Codex => "Codex is asking a question",
+        }
+    };
+    Notification::new(
+        client,
+        notification_title(client, project),
+        format!("{} needs input", client.display_name()),
+        context_message(task, "Question", question),
+    )
+}
+
+pub fn input_notification(project: &str, task: &str, message: &str) -> Notification {
     Notification::new(
         Client::Claude,
-        if project.is_empty() { "Claude Code" } else { project },
+        notification_title(Client::Claude, project),
         "Claude needs input",
-        context_message(task, "Question", if question.is_empty() { "Claude is asking a question" } else { question }),
+        context_message(task, "Message", message),
     )
+}
+
+fn notification_title(client: Client, project: &str) -> &str {
+    if !project.is_empty() {
+        project
+    } else {
+        match client {
+            Client::Claude => "Claude Code",
+            Client::Codex => "Codex",
+        }
+    }
 }
 
 fn shell_quote(value: &str) -> String {

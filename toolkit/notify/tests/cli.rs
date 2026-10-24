@@ -38,6 +38,7 @@ impl TestEnv {
         let mut command = Command::new(env!("CARGO_BIN_EXE_ai-notify"));
         command
             .env("HOME", &self.home)
+            .env_remove("CODEX_HOME")
             .env("XDG_CONFIG_HOME", &self.xdg)
             .env("PATH", &self.bin)
             .env("AI_NOTIFY_LOG", "0")
@@ -215,6 +216,52 @@ fn native_codex_hooks_read_stdin_and_complete_the_tracked_turn_silently() {
 }
 
 #[test]
+fn attention_and_interrupt_hook_commands_keep_stdout_empty_and_errors_nonblocking() {
+    let environment = TestEnv::new();
+    let database = environment._root.path().join("state/sessions.db");
+    let log = environment._root.path().join("logs/ai-notify.log");
+    environment.write_runtime_config(&database, &log);
+    let config = environment.config_path();
+    let contents = fs::read_to_string(&config).unwrap();
+    fs::write(config, format!("{contents}  mode: disabled\n")).unwrap();
+    for (event, payload) in [
+        ("elicitation", r#"{"session_id":"s","mcp_server_name":"docs","message":"Continue?"}"#),
+        ("notification", r#"{"session_id":"s","notification_type":"agent_needs_input","message":"Please reply"}"#),
+        (
+            "notification",
+            r#"{"session_id":"s","notification_type":"quota_auto_resume_stale","message":"Resume manually"}"#,
+        ),
+        (
+            "notification",
+            r#"{"session_id":"s","notification_type":"quota_auto_resume_disabled","message":"Resume manually"}"#,
+        ),
+        (
+            "codex",
+            r#"{"hook_event_name":"PermissionRequest","session_id":"s","turn_id":"t","tool_name":"shell","tool_input":{"command":"echo ok"}}"#,
+        ),
+        (
+            "codex",
+            r#"{"hook_event_name":"PreToolUse","session_id":"s","turn_id":"t","tool_name":"request_user_input","tool_input":{"questions":[{"question":"Continue?"}]}}"#,
+        ),
+        ("codex", r#"{"hook_event_name":"Interrupt","session_id":"s","turn_id":"t"}"#),
+    ] {
+        environment.run(&["event", event], payload).success().stdout("");
+    }
+    for event in ["elicitation", "notification", "codex"] {
+        for payload in ["{", "[]", r#"{"session_id":42}"#] {
+            environment.run(&["event", event], payload).code(1).stdout("");
+        }
+    }
+    for payload in [
+        r#"{"hook_event_name":"PermissionRequest","session_id":"s"}"#,
+        r#"{"hook_event_name":"PreToolUse","session_id":"s"}"#,
+        r#"{"hook_event_name":"Interrupt","session_id":"s"}"#,
+    ] {
+        environment.run(&["event", "codex"], payload).code(1).stdout("");
+    }
+}
+
+#[test]
 fn link_claude_supports_dry_run_updates_and_schema_failures() {
     let environment = TestEnv::new();
     let settings = environment.home.join(".claude/settings.json");
@@ -354,6 +401,256 @@ fn link_codex_preserves_conflicts_and_supports_force_and_profiles() {
 
     environment.run(&["link", "codex", "--path", config.to_str().unwrap(), "--profile", "quiet"], "").success();
     assert!(config.with_file_name("quiet.config.toml").exists());
+}
+
+#[test]
+fn link_codex_hooks_installs_five_passive_hooks_and_is_idempotent() {
+    let environment = TestEnv::new();
+    let path = environment.home.join(".codex/hooks.json");
+    environment.run(&["link", "codex-hooks"], "").success().stdout(
+        predicate::str::contains(path.to_str().unwrap())
+            .and(predicate::str::contains(
+                "Added events: UserPromptSubmit, Stop, PermissionRequest, PreToolUse, Interrupt",
+            ))
+            .and(predicate::str::contains("/hooks"))
+            .and(predicate::str::contains("--previous-notify")),
+    );
+    let contents = fs::read(&path).unwrap();
+    let data: serde_json::Value = serde_json::from_slice(&contents).unwrap();
+    assert_eq!(data["hooks"].as_object().unwrap().len(), 5);
+    assert_eq!(data["hooks"]["PreToolUse"][0]["matcher"], "^request_user_input$");
+    assert!(data["hooks"]["PermissionRequest"][0].get("matcher").is_none());
+    for event in ["UserPromptSubmit", "Stop", "PermissionRequest", "PreToolUse", "Interrupt"] {
+        let hook = &data["hooks"][event][0]["hooks"][0];
+        assert_eq!(hook["command"], "ai-notify event codex");
+        assert_eq!(hook["timeout"], if event == "Interrupt" { 1 } else { 5 });
+    }
+    environment.run(&["link", "codex-hooks"], "").success().stdout(predicate::str::contains("already set"));
+    assert_eq!(fs::read(&path).unwrap(), contents);
+    assert!(!path.with_file_name("config.toml").exists());
+}
+
+#[test]
+fn link_codex_hooks_respects_custom_paths_codex_home_and_dry_run() {
+    let environment = TestEnv::new();
+    let codex_home = environment._root.path().join("custom-codex");
+    environment
+        .command()
+        .env("CODEX_HOME", &codex_home)
+        .args(["link", "codex-hooks", "--dry-run"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("DRY RUN"));
+    assert!(!codex_home.exists());
+    environment.command().env("CODEX_HOME", &codex_home).args(["link", "codex-hooks"]).assert().success();
+    assert!(codex_home.join("hooks.json").exists());
+    environment
+        .command()
+        .env("CODEX_HOME", &codex_home)
+        .arg("check")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Codex CLI notify: OK"));
+    assert!(!environment.home.join(".codex").exists());
+
+    let custom_path = environment._root.path().join("other/hooks.json");
+    let arguments = ["link", "codex-hooks", "--path", custom_path.to_str().unwrap()];
+    environment.run(&[arguments.as_slice(), &["--dry-run"]].concat(), "").success();
+    assert!(!custom_path.exists());
+    environment.run(&arguments, "").success();
+    assert!(custom_path.exists());
+    environment.command().env("CODEX_HOME", "").args(["link", "codex-hooks"]).assert().success();
+    assert!(environment.home.join(".codex/hooks.json").exists());
+}
+
+#[test]
+fn link_codex_hooks_preserves_unrelated_fields_and_consolidates_owned_definitions() {
+    use serde_json::json;
+    let environment = TestEnv::new();
+    let path = environment.home.join(".codex/hooks.json");
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    let handler =
+        json!({"type": "command", "command": "/opt/bin/ai-notify event codex", "timeout": 11, "custom_option": true});
+    let unrelated = json!({"type":"command", "command":"echo keep", "timeout":3});
+    let original = json!({"other": {"enabled": true}, "hooks": {
+        "UserPromptSubmit": [{"matcher": "irrelevant", "hooks": [handler]}],
+        "PermissionRequest": [
+            {"matcher": "Bash", "group_option": "keep", "hooks": [handler, unrelated]},
+            {"matcher": "Read", "hooks": [handler]}
+        ],
+        "PreToolUse": [
+            {"matcher": "other|request_user_input", "group_option": "keep", "hooks": [unrelated, handler]},
+            {"matcher": "other", "hooks": [handler]}
+        ],
+        "CustomEvent": [{}, {"matcher":null}, {"matcher":"Bash"}, {"hooks": [{"type": "future", "extra": "keep"}]}]
+    }});
+    fs::write(&path, serde_json::to_string(&original).unwrap()).unwrap();
+    let notify_path = path.with_file_name("config.toml");
+    let notify = "notify = [\"ai-notify\", \"codex\"]\n";
+    fs::write(&notify_path, notify).unwrap();
+    let before = fs::read(&path).unwrap();
+    environment.run(&["link", "codex-hooks", "--dry-run"], "").success();
+    assert_eq!(fs::read(&path).unwrap(), before);
+    environment.run(&["link", "codex-hooks"], "").success().stdout(
+        predicate::str::contains("Consolidated events: PermissionRequest, PreToolUse")
+            .and(predicate::str::contains("Added events: Stop, Interrupt")),
+    );
+    let data: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    assert_eq!(data["other"], original["other"]);
+    assert_eq!(data["hooks"]["CustomEvent"], original["hooks"]["CustomEvent"]);
+    assert_eq!(data["hooks"]["UserPromptSubmit"], original["hooks"]["UserPromptSubmit"]);
+    for event in ["PermissionRequest", "PreToolUse"] {
+        let groups = data["hooks"][event].as_array().unwrap();
+        assert_eq!(groups.len(), 3);
+        for (before, after) in original["hooks"][event].as_array().unwrap().iter().zip(groups) {
+            let mut expected = before.clone();
+            expected["hooks"].as_array_mut().unwrap().retain(|hook| hook != &handler);
+            assert_eq!(&expected, after);
+        }
+        let owned = groups
+            .iter()
+            .flat_map(|group| group["hooks"].as_array().unwrap())
+            .filter(|hook| hook["command"] == handler["command"])
+            .collect::<Vec<_>>();
+        assert_eq!(owned, vec![&handler]);
+        assert_eq!(groups[2]["hooks"], json!([handler]));
+        if event == "PermissionRequest" {
+            assert!(groups[2].get("matcher").is_none());
+        } else {
+            assert_eq!(groups[2]["matcher"], "^request_user_input$");
+        }
+    }
+    let before = fs::read(&path).unwrap();
+    environment.run(&["link", "codex-hooks"], "").success();
+    assert_eq!(before, fs::read(&path).unwrap());
+    assert_eq!(fs::read_to_string(notify_path).unwrap(), notify);
+}
+
+#[test]
+fn link_codex_hooks_keeps_equivalent_definitions_without_timeout_changes() {
+    use serde_json::json;
+    let environment = TestEnv::new();
+    let path = environment.home.join(".codex/hooks.json");
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    let handler = json!({"type":"command", "command":"ai-notify event codex"});
+    let data = json!({"hooks": {
+        "UserPromptSubmit": [{"hooks":[handler]}],
+        "Stop": [{"hooks":[handler]}],
+        "PermissionRequest": [{"matcher":null, "hooks":[handler]}],
+        "PreToolUse": [{"matcher":"request_user_input", "hooks":[handler]}],
+        "Interrupt": [{"matcher":"ignored", "hooks":[handler]}]
+    }});
+    let original = serde_json::to_string(&data).unwrap();
+    fs::write(&path, &original).unwrap();
+    environment.run(&["link", "codex-hooks"], "").success().stdout(predicate::str::contains("already set"));
+    assert_eq!(fs::read_to_string(path).unwrap(), original);
+}
+
+#[test]
+fn link_codex_hooks_refuses_conflicting_owned_definitions_without_any_write() {
+    use serde_json::json;
+    let environment = TestEnv::new();
+    let path = environment.home.join(".codex/hooks.json");
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    let handler = json!({"type":"command", "command":"ai-notify event codex", "timeout":5});
+    for event in ["PermissionRequest", "PreToolUse"] {
+        for conflicting in [
+            json!({"type":"command", "command":"/opt/bin/ai-notify event codex", "timeout":5}),
+            json!({"type":"command", "command":"ai-notify event codex", "timeout":8}),
+            json!({"type":"command", "command":"ai-notify event codex", "timeout":5, "extra":true}),
+        ] {
+            let mut hooks = serde_json::Map::new();
+            hooks.insert(
+                event.to_owned(),
+                json!([
+                    {"matcher":"Bash", "hooks":[handler]},
+                    {"matcher":"other|request_user_input", "hooks":[conflicting]}
+                ]),
+            );
+            let original = serde_json::to_string(&json!({"hooks":hooks, "keep":true})).unwrap();
+            fs::write(&path, &original).unwrap();
+            for flags in [vec!["link", "codex-hooks"], vec!["link", "codex-hooks", "--dry-run"]] {
+                environment.run(&flags, "").code(1).stderr(
+                    predicate::str::contains("conflicting ai-notify definitions")
+                        .and(predicate::str::contains(event))
+                        .and(predicate::str::contains("before rerunning link codex-hooks")),
+                );
+                assert_eq!(fs::read_to_string(&path).unwrap(), original);
+            }
+        }
+    }
+}
+
+#[test]
+fn link_codex_hooks_refuses_malformed_data_without_writing() {
+    let environment = TestEnv::new();
+    let path = environment.home.join(".codex/hooks.json");
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    for malformed in [
+        "{",
+        "[]",
+        r#"{"hooks":[]}"#,
+        r#"{"hooks":{"Stop":{}}}"#,
+        r#"{"hooks":{"Stop":[null]}}"#,
+        r#"{"hooks":{"Stop":[{"hooks":{}}]}}"#,
+        r#"{"hooks":{"Stop":[{"matcher":42,"hooks":[]}]}}"#,
+        r#"{"hooks":{"Stop":[{"hooks":["bad"]}]}}"#,
+    ] {
+        fs::write(&path, malformed).unwrap();
+        environment.run(&["link", "codex-hooks"], "").code(1);
+        assert_eq!(fs::read_to_string(&path).unwrap(), malformed);
+        environment.run(&["check"], "").code(1).stdout(predicate::str::contains("Native hooks error:"));
+        assert_eq!(fs::read_to_string(&path).unwrap(), malformed);
+    }
+}
+
+#[test]
+fn check_codex_optional_coverage_is_matcher_aware_and_keeps_completion_compatibility() {
+    use serde_json::json;
+    let environment = TestEnv::new();
+    let path = environment.home.join(".codex/hooks.json");
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    let handler = json!({"type":"command", "command":"ai-notify event codex"});
+    let mut data = json!({"hooks": {
+        "UserPromptSubmit": [{"matcher":"anything", "hooks":[handler]}],
+        "Stop": [{"matcher":"anything", "hooks":[handler]}],
+        "PermissionRequest": [{"matcher":"Bash", "hooks":[handler]}],
+        "PreToolUse": [{"matcher":"request_.*", "hooks":[handler]}],
+        "Interrupt": [{"hooks":[handler]}]
+    }});
+    fs::write(&path, serde_json::to_string(&data).unwrap()).unwrap();
+    environment.run(&["check"], "").success().stdout(
+        predicate::str::contains("Codex CLI notify: OK")
+            .and(predicate::str::contains("Missing optional native hook events: PermissionRequest, PreToolUse"))
+            .and(predicate::str::contains("Present optional native hook events: Interrupt"))
+            .and(predicate::str::contains("trust are unverified")),
+    );
+    for matcher in ["", "*", ".*", "^.*$"] {
+        data["hooks"]["PermissionRequest"][0]["matcher"] = json!(matcher);
+        data["hooks"]["PreToolUse"][0]["matcher"] = json!(matcher);
+        fs::write(&path, serde_json::to_string(&data).unwrap()).unwrap();
+        environment
+            .run(&["check"], "")
+            .success()
+            .stdout(predicate::str::contains("Native optional attention/lifecycle coverage: COMPLETE"));
+    }
+    for matcher in ["request_user_input", "^request_user_input$"] {
+        data["hooks"]["PreToolUse"][0]["matcher"] = json!(matcher);
+        fs::write(&path, serde_json::to_string(&data).unwrap()).unwrap();
+        environment
+            .run(&["check"], "")
+            .success()
+            .stdout(predicate::str::contains("Native optional attention/lifecycle coverage: COMPLETE"));
+    }
+    fs::write(path.with_file_name("config.toml"), "notify = [\"ai-notify\", \"codex\"]\n").unwrap();
+    environment.run(&["check"], "").success().stdout(predicate::str::contains("Possible duplicate completion setup"));
+    data["hooks"].as_object_mut().unwrap().remove("UserPromptSubmit");
+    fs::write(&path, serde_json::to_string(&data).unwrap()).unwrap();
+    environment.run(&["check"], "").success().stdout(
+        predicate::str::contains("Codex CLI notify: OK")
+            .and(predicate::str::contains("Possible duplicate completion setup"))
+            .and(predicate::str::contains("Missing native hook events: UserPromptSubmit")),
+    );
 }
 
 #[test]
@@ -572,5 +869,5 @@ fn event_payload_failures_never_exit_2() {
     environment
         .run(&["event", "codex"], r#"{"hook_event_name":"Other","session_id":"s","turn_id":"t"}"#)
         .code(1)
-        .stderr(predicate::str::contains("Codex hook must be UserPromptSubmit or Stop"));
+        .stderr(predicate::str::contains("Codex hook"));
 }
