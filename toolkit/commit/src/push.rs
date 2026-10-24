@@ -7,6 +7,7 @@ use crate::{
 pub enum PushOutcome {
     Pushed { branch: String, rebased: Option<u64> },
     PushedNew { branch: String },
+    SkippedNoRemote { branch: String },
     Behind { branch: String, count: u64, refusal: Option<String> },
 }
 
@@ -20,6 +21,7 @@ impl PushOutcome {
                 println!("PUSHED {branch}");
             }
             Self::PushedNew { branch } => println!("PUSHED_NEW {branch}"),
+            Self::SkippedNoRemote { branch } => println!("PUSH_SKIPPED {branch} no-remote"),
             Self::Behind { branch, count, .. } => println!("BEHIND {branch} {count}"),
         }
     }
@@ -29,7 +31,7 @@ impl PushOutcome {
     pub fn retry_error(&self) -> AppError {
         match self {
             Self::Behind { refusal, .. } => AppError::retry(refusal.clone().unwrap_or_default()),
-            Self::Pushed { .. } | Self::PushedNew { .. } => AppError::retry(""),
+            Self::Pushed { .. } | Self::PushedNew { .. } | Self::SkippedNoRemote { .. } => AppError::retry(""),
         }
     }
 }
@@ -49,8 +51,10 @@ struct Destination {
 
 pub fn execute(repository: &Repository, rebase: bool) -> Result<PushOutcome> {
     let branch = repository.branch()?;
+    let Some(mut destination) = destination(repository, &branch)? else {
+        return Ok(PushOutcome::SkippedNoRemote { branch });
+    };
     repository.head()?;
-    let mut destination = destination(repository, &branch)?;
     destination.compare_ref = fetch(repository, &destination)?;
     if destination.set_upstream {
         destination.new_branch = destination.compare_ref.is_none();
@@ -102,13 +106,16 @@ pub fn execute(repository: &Repository, rebase: bool) -> Result<PushOutcome> {
 /// is authoritative even when it is a URL; only a branch without one falls back to `origin`. A
 /// differently named upstream branch is accepted only when `branch.<name>.pushRemote` names the same
 /// remote, which `gh pr checkout` writes for a PR head such as a fork's `main`.
-fn destination(repository: &Repository, branch: &str) -> Result<Destination> {
+fn destination(repository: &Repository, branch: &str) -> Result<Option<Destination>> {
     let Some(remote) = config(repository, &format!("branch.{branch}.remote"))? else {
+        if repository.text(["remote"], None)?.is_empty() {
+            return Ok(None);
+        }
         let remote_exists = repository.raw(["remote", "get-url", "origin"], None)?;
         if !remote_exists.status.success() {
             return Err(AppError::usage(format!("branch {branch} has no upstream and remote 'origin' does not exist")));
         }
-        return Ok(Destination {
+        return Ok(Some(Destination {
             branch: branch.to_owned(),
             remote: "origin".to_owned(),
             remote_branch: branch.to_owned(),
@@ -116,7 +123,7 @@ fn destination(repository: &Repository, branch: &str) -> Result<Destination> {
             compare_ref: None,
             new_branch: true,
             set_upstream: true,
-        });
+        }));
     };
     let merge = config(repository, &format!("branch.{branch}.merge"))?.ok_or_else(|| {
         AppError::usage(format!("branch {branch} sets remote {remote} without branch.{branch}.merge"))
@@ -135,7 +142,7 @@ fn destination(repository: &Repository, branch: &str) -> Result<Destination> {
     }
     let branch_ref = format!("refs/heads/{branch}");
     let upstream = repository.text(["for-each-ref", "--format=%(upstream)", &branch_ref], None)?;
-    Ok(Destination {
+    Ok(Some(Destination {
         branch: branch.to_owned(),
         remote,
         remote_branch,
@@ -143,7 +150,7 @@ fn destination(repository: &Repository, branch: &str) -> Result<Destination> {
         compare_ref: None,
         new_branch: false,
         set_upstream: false,
-    })
+    }))
 }
 
 fn config(repository: &Repository, key: &str) -> Result<Option<String>> {

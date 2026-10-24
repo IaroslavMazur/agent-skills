@@ -5,6 +5,83 @@ use std::{fs, process::Command};
 use common::{Harness, exit_code, git_at, git_binary, init_bare, stderr, stdout, write_executable};
 
 #[test]
+fn local_only_push_skips_without_fetch_push_or_rebase() {
+    let harness = Harness::new("push-no-remote");
+    harness.git(["symbolic-ref", "HEAD", "refs/heads/main"]);
+    let real_git = git_binary();
+    let marker = harness.root.join("network-ran");
+    write_executable(
+        &harness.shim.join("git"),
+        "#!/bin/sh\ncase \" $* \" in *' fetch '*|*' push '*|*' rebase '*) : > \"$NETWORK_MARKER\"; exit 91;; esac\nexec \"$REAL_GIT\" \"$@\"\n",
+    );
+
+    for has_commit in [false, true] {
+        if has_commit {
+            harness.write("intended.txt", "base\n");
+            harness.commit_all("base");
+        }
+        for arguments in [vec!["push"], vec!["push", "--rebase"]] {
+            let skipped = harness.success_with_env(
+                arguments,
+                [("REAL_GIT", real_git.to_str().unwrap()), ("NETWORK_MARKER", marker.to_str().unwrap())],
+            );
+            assert_eq!(stdout(&skipped), "PUSH_SKIPPED main no-remote\n");
+            assert!(stderr(&skipped).is_empty());
+            assert!(!marker.exists());
+            assert!(harness.git(["remote"]).is_empty());
+        }
+    }
+}
+
+#[test]
+fn commit_without_remotes_keeps_a_local_receipt_until_push_is_requested_again() {
+    let harness = Harness::new("commit-push-no-remote");
+    harness.git(["symbolic-ref", "HEAD", "refs/heads/main"]);
+    harness.write("intended.txt", "local\n");
+    let (transaction, _) = harness.prepare(&["intended.txt"]);
+
+    let committed = harness.success(["commit", &transaction, "-m", "test: local", "--push", "--rebase"]);
+    let head = harness.git(["rev-parse", "HEAD"]);
+    let local_receipt = format!("COMMITTED {transaction} {}\n", &head[..12]);
+    let skipped_receipt = format!("{local_receipt}PUSH_SKIPPED main no-remote\n");
+    assert_eq!(stdout(&committed), skipped_receipt);
+    let receipt: serde_json::Value =
+        serde_json::from_slice(&fs::read(harness.transaction_json(&transaction)).unwrap()).unwrap();
+    assert_eq!(receipt["status"], "committed");
+    assert_eq!(receipt["push_requested"], false);
+    assert!(receipt["terminal_at"].is_number());
+    assert_eq!(harness.git(["show", "HEAD:intended.txt"]), "local");
+
+    let replay = harness.success(["commit", &transaction, "-m", "ignored", "--push"]);
+    assert_eq!(stdout(&replay), skipped_receipt);
+    assert_eq!(harness.git(["rev-parse", "HEAD"]), head);
+
+    let remote = harness.root.join("remote.git");
+    init_bare(&remote, &harness.home);
+    harness.git(["remote", "add", "origin", &format!("file://{}", remote.display())]);
+    let local_replay = harness.success(["commit", &transaction, "-m", "ignored"]);
+    assert_eq!(stdout(&local_replay), local_receipt);
+    assert!(harness.git(["ls-remote", "origin", "refs/heads/main"]).is_empty());
+
+    let pushed = harness.success(["commit", &transaction, "-m", "ignored", "--push"]);
+    assert_eq!(stdout(&pushed), format!("{local_receipt}PUSHED_NEW main\n"));
+    assert_eq!(git_at(&remote, &harness.home, ["rev-parse", "refs/heads/main"]), head);
+}
+
+#[test]
+fn a_named_remote_without_origin_or_upstream_is_still_a_configuration_error() {
+    let harness = Harness::new("push-other-remote");
+    harness.write("intended.txt", "base\n");
+    harness.commit_all("base");
+    harness.git(["remote", "add", "upstream", "file:///nonexistent.git"]);
+
+    let refused = harness.command(["push"]);
+    assert_eq!(exit_code(&refused), 2);
+    assert!(stderr(&refused).contains("remote 'origin' does not exist"));
+    assert!(stdout(&refused).is_empty());
+}
+
+#[test]
 fn standalone_push_handles_existing_upstream_and_clean_ahead() {
     let harness = Harness::new("push-upstream");
     let remote = harness.root.join("remote.git");
@@ -171,6 +248,20 @@ fn fork_pr_checkout_pushes_to_the_pr_head_without_changing_tracking() {
     assert!(harness.git(["ls-remote", "origin", "refs/heads/pr-1"]).is_empty());
     assert_ne!(harness.git(["rev-parse", "HEAD"]), git_at(&origin, &harness.home, ["rev-parse", "refs/heads/main"]));
     assert_eq!(harness.git(["config", "--get-regexp", "^branch\\.pr-1\\."]), config_before);
+}
+
+#[test]
+fn url_upstream_pushes_without_any_named_remotes() {
+    let (harness, _origin, fork) = fork_pr_fixture("push-url-no-named-remotes");
+    harness.git(["remote", "remove", "origin"]);
+    assert!(harness.git(["remote"]).is_empty());
+    harness.write("intended.txt", "pr work\n");
+    harness.commit_all("pr work");
+
+    let pushed = harness.success(["push"]);
+
+    assert_eq!(stdout(&pushed), "PUSHED pr-1\n");
+    assert_eq!(harness.git(["rev-parse", "HEAD"]), git_at(&fork, &harness.home, ["rev-parse", "refs/heads/main"]));
 }
 
 #[test]

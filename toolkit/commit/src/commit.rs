@@ -701,6 +701,13 @@ fn maybe_push(repository: &Repository, transaction: &mut Transaction, store: &St
     transaction.terminal_at = None;
     store.save(transaction)?;
     match push::execute(repository, args.rebase)? {
+        outcome @ PushOutcome::SkippedNoRemote { .. } => {
+            transaction.push_requested = false;
+            transaction.terminal_at = Some(now_seconds());
+            store.save(transaction)?;
+            outcome.print();
+            Ok(())
+        }
         outcome @ PushOutcome::Behind { .. } => {
             outcome.print();
             Err(outcome.retry_error())
@@ -715,7 +722,7 @@ fn maybe_push(repository: &Repository, transaction: &mut Transaction, store: &St
                     format!("PUSHED {branch}")
                 }
                 PushOutcome::PushedNew { branch } => format!("PUSHED_NEW {branch}"),
-                PushOutcome::Behind { .. } => unreachable!(),
+                PushOutcome::Behind { .. } | PushOutcome::SkippedNoRemote { .. } => unreachable!(),
             };
             transaction.status = TransactionStatus::Pushed;
             transaction.push_requested = false;
