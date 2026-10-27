@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import select
 import subprocess
 import tempfile
 import threading
@@ -255,14 +256,7 @@ class WatchCodexWaveTests(unittest.TestCase):
                 progress = Path(directory) / f"{name}.progress.jsonl"
                 progress.write_text(json.dumps(event) + "\n")
 
-                def finish(progress: Path = progress) -> None:
-                    time.sleep(0.08)
-                    with progress.open("a") as handle:
-                        handle.write('{"type":"handoff.completed"}\n')
-
-                thread = threading.Thread(target=finish)
-                thread.start()
-                result = subprocess.run(
+                with subprocess.Popen(
                     [
                         "bash",
                         str(SCRIPT),
@@ -275,14 +269,24 @@ class WatchCodexWaveTests(unittest.TestCase):
                         "--poll-seconds",
                         "0.01",
                     ],
-                    check=False,
                     text=True,
-                    capture_output=True,
-                    timeout=2,
-                )
-                thread.join()
-                self.assertEqual(result.returncode, 0, result.stderr)
-                records = [json.loads(line) for line in result.stdout.splitlines()]
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                ) as process:
+                    try:
+                        assert process.stdout is not None
+                        ready, _, _ = select.select([process.stdout], [], [], 2)
+                        self.assertTrue(ready, "watcher did not emit a digest")
+                        first_line = process.stdout.readline()
+                        with progress.open("a") as handle:
+                            handle.write('{"type":"handoff.completed"}\n')
+                        output, stderr = process.communicate(timeout=2)
+                    finally:
+                        if process.poll() is None:
+                            process.kill()
+                            process.communicate()
+                self.assertEqual(process.returncode, 0, stderr)
+                records = [json.loads(line) for line in (first_line + output).splitlines()]
                 digest = next(record for record in records if record["type"] == "watcher.digest")
                 self.assertFalse(digest["noRecentActivity"])
                 self.assertEqual(digest["eventCount"], 1)

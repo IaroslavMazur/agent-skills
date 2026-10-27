@@ -39,6 +39,7 @@ assert_arg() {
 }
 
 rg -F --quiet '"uniqueItems"' "$schema" "$research_schema" && fail "result schemas use unsupported uniqueItems"
+rg --no-config -F --quiet '"$schema"' "$schema" "$research_schema" && fail "result schemas declare a dialect unsupported by the Claude CLI"
 
 expect_failure() {
   expected_rc="$1"
