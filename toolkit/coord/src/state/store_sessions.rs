@@ -92,9 +92,15 @@ impl Store {
     }
 
     /// Replace Claude rows only after a complete, authoritative provider
-    /// inventory. Missing rows are terminal; a failed or malformed inventory
-    /// must never call this method.
-    pub(crate) fn replace_claude_sessions(&mut self, updates: &[SessionUpdate]) -> Result<()> {
+    /// inventory. Missing rows are terminal unless `alive` holds their session
+    /// ID: a verified live process outranks an omission from the listing, which
+    /// can be empty while interactive sessions run. A failed or malformed
+    /// inventory must never call this method.
+    pub(crate) fn replace_claude_sessions(
+        &mut self,
+        updates: &[SessionUpdate],
+        alive: &std::collections::HashSet<String>,
+    ) -> Result<()> {
         self.immediate(|transaction| {
             let existing = {
                 let mut statement = transaction.prepare("SELECT session_id FROM sessions WHERE client = 'claude'")?;
@@ -112,7 +118,7 @@ impl Store {
             }
             let mut removed = false;
             for session_id in existing {
-                if !live.contains(session_id.as_str()) {
+                if !live.contains(session_id.as_str()) && !alive.contains(&session_id) {
                     remove_session(transaction, &Identity { client: crate::domain::Client::Claude, session_id })?;
                     removed = true;
                 }

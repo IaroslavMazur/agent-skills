@@ -19,8 +19,8 @@ use super::{
 };
 use crate::{
     domain::{
-        Client, Identity, InventoryResult, OutcomeKind, ProcessFingerprint, ProcessLiveness, ProcessProbe, Scope,
-        ScopeKind, SessionState, WorkState,
+        Client, Identity, InventoryResult, OutcomeKind, ProcessFingerprint, ProcessLiveness, ProcessProbe,
+        ProviderReport, Scope, ScopeKind, SessionState, WorkState,
     },
     error::Result,
     host::{ClaudeSessionObservation, WorkClaimRequest, git_blob_hashes, git_dirty_paths, git_last_commit_times},
@@ -249,6 +249,72 @@ fn fixture(count: usize, sessions: &[(&Identity, usize, u32)]) -> (TempDir, Vec<
 
 fn files(roots: &[PathBuf], names: &[&str]) -> Vec<PathBuf> {
     roots.iter().zip(names).map(|(root, name)| root.join(name)).collect()
+}
+
+/// An authoritative Claude listing that names no session, as `claude agents --json` prints `[]` while interactive
+/// sessions are open.
+struct EmptyClaudeListing;
+
+impl ProviderInventory for EmptyClaudeListing {
+    fn cache_key(&self) -> &str {
+        "empty-claude-listing"
+    }
+
+    fn refresh(&mut self, _store: &Store, _probe: &dyn ProcessProbe) -> Result<InventoryObservation> {
+        let providers = [Client::Codex, Client::Claude]
+            .into_iter()
+            .map(|client| ProviderReport {
+                client,
+                ok: true,
+                source: "static".to_owned(),
+                enabled: true,
+                dropped: 0,
+                error: None,
+            })
+            .collect();
+        Ok(InventoryObservation {
+            result: InventoryResult { complete: true, providers },
+            claude_sessions: Vec::new(),
+            claude_authoritative: true,
+        })
+    }
+}
+
+#[test]
+fn authoritative_claude_listing_keeps_live_sessions_and_drops_unverifiable_ones() {
+    let (temp, roots) = repos(1);
+    let mut store = Store::open(temp.path().join("state.db")).unwrap();
+    let live = Identity { client: Client::Claude, session_id: "live".to_owned() };
+    let unverifiable = Identity { client: Client::Claude, session_id: "unverifiable".to_owned() };
+    add_session(&mut store, &live, &roots[0], 50, 1.0);
+    store
+        .upsert_session(&SessionUpdate {
+            identity: unverifiable.clone(),
+            cwd: roots[0].to_string_lossy().into_owned(),
+            repo_root: Some(roots[0].to_string_lossy().into_owned()),
+            state: SessionState::Working,
+            source: "test".to_owned(),
+            name: None,
+            waiting_for: None,
+            permission_mode: None,
+            update_permission_mode: false,
+            coordination_waived: None,
+            fingerprint: None,
+            transcript_path: None,
+            started_at: Some(1.0),
+            current: 1.0,
+        })
+        .unwrap();
+    let probe = Arc::new(FakeProbe::default());
+    probe.set(50, ProcessLiveness::Alive);
+    let coordinator =
+        Coordinator::with_components(store, Box::new(EmptyClaudeListing), probe, Arc::new(FakeClock::new(100.0)));
+
+    let outcome = coordinator.start_for(live.clone(), "work", &[PathBuf::from("src/lib.rs")], &[], &roots[0]).unwrap();
+    assert_eq!(outcome.kind, OutcomeKind::Ready);
+    let store = coordinator.store().unwrap();
+    assert!(store.session(&live).unwrap().is_some());
+    assert!(store.session(&unverifiable).unwrap().is_none());
 }
 
 #[test]

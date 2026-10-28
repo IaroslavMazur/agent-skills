@@ -24,14 +24,15 @@ use unicode_normalization::UnicodeNormalization;
 
 use crate::{
     domain::{
-        Identity, InventoryResult, OutsideScopeV2, ProcessProbe, ProviderReport, SessionState, SnapshotDelegateV2,
-        SnapshotDraftClaimV2, SnapshotDraftV2, SnapshotHandoffV4, SnapshotScopeKindV2, SnapshotScopeV2,
-        SnapshotSessionV2, SnapshotV2, SnapshotWorkClaimV2, SnapshotWorkV2, WorkState, sanitize,
+        Client, Identity, InventoryResult, OutsideScopeV2, ProcessLiveness, ProcessProbe, ProviderReport, SessionState,
+        SnapshotDelegateV2, SnapshotDraftClaimV2, SnapshotDraftV2, SnapshotHandoffV4, SnapshotScopeKindV2,
+        SnapshotScopeV2, SnapshotSessionV2, SnapshotV2, SnapshotWorkClaimV2, SnapshotWorkV2, WorkState, sanitize,
     },
     error::{AppError, Result},
     host::{
         DelegateSignal, INVENTORY_CACHE_SECONDS, NativeProcessProbe, delegate_signal, from_environment,
         git_blob_hashes, git_dirty_paths, git_root, host_process_reference, identity_key, process_ancestors,
+        process_sweep,
     },
     server::{SnapshotMessageV1, SnapshotSource},
     state::{DraftRow, MessageRow, ProviderCacheRow, SessionRow, SessionUpdate, Store, WorkRow, callsign_key},
@@ -316,7 +317,19 @@ impl Coordinator {
                         current: self.clock.wall(),
                     })
                     .collect::<Vec<_>>();
-                store.replace_claude_sessions(&updates)?;
+                let alive = process_sweep(
+                    self.probe.as_ref(),
+                    store
+                        .sessions()?
+                        .into_iter()
+                        .filter(|row| row.identity.client == Client::Claude)
+                        .map(|row| (row.identity, row.fingerprint)),
+                )
+                .into_iter()
+                .filter(|observation| observation.liveness == ProcessLiveness::Alive)
+                .map(|observation| observation.identity.session_id)
+                .collect::<HashSet<_>>();
+                store.replace_claude_sessions(&updates, &alive)?;
                 unknown_clients = self.reconcile_processes(store)?;
             }
             if observation.result.complete {
